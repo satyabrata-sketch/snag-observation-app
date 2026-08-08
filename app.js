@@ -32,6 +32,12 @@ const STATE = {
   auth: null
 };
 
+// Dynamic Building Location & Floor Options Store (Default: NAB, DT3 & 3rd Floor)
+let SITE_LOCATIONS = {
+  buildings: ['NAB', 'DT3'],
+  floors: ['3rd', 'Ground Floor', '1st Floor', '2nd Floor', '4th Floor', '5th Floor', 'Terrace']
+};
+
 // Registered System Users Database (Clean initial database - default single Admin account)
 let SYSTEM_USERS = [
   { id: 'usr_admin', name: 'Site Admin Manager', mobile: '7008952166', email: 'admin@site.com', password: 'Satya@1996', role: 'Admin', category: 'General', created: '2026-01-01' }
@@ -78,6 +84,18 @@ function initLocalStorage() {
     localStorage.setItem('snag_tracker_snags', JSON.stringify(snagsStore));
   }
 
+  const savedLocs = localStorage.getItem('snag_tracker_locations');
+  if (savedLocs) {
+    try {
+      const parsedLocs = JSON.parse(savedLocs);
+      if (parsedLocs && parsedLocs.buildings && parsedLocs.floors) {
+        SITE_LOCATIONS = parsedLocs;
+      }
+    } catch (e) {}
+  } else {
+    localStorage.setItem('snag_tracker_locations', JSON.stringify(SITE_LOCATIONS));
+  }
+
   const savedUsers = localStorage.getItem('snag_tracker_users');
   if (savedUsers) {
     try {
@@ -108,6 +126,9 @@ function initLocalStorage() {
       }
     } catch (e) {}
   }
+
+  // Render dynamic building location & floor dropdowns
+  renderLocationOptions();
 
   // Auto-connect default hardcoded Firebase config (snag-tracker-9fae8)
   const fbConfig = DEFAULT_FIREBASE_CONFIG;
@@ -171,8 +192,137 @@ function handleUserLoginSubmit(e) {
       switchSection('user');
     }
     renderApp();
+    alert(`👋 Welcome back, ${matchedUser.name}!\nLogged in as: ${matchedUser.role} (${matchedUser.category})`);
   } else {
     document.getElementById('userAuthError').classList.remove('hidden');
+  }
+}
+
+// User Profile Modal Handlers
+function openUserProfileModal() {
+  if (!STATE.currentUser) return;
+  const u = STATE.currentUser;
+  
+  const pName = document.getElementById('profileName');
+  const pRole = document.getElementById('profileRoleBadge');
+  const pMobile = document.getElementById('profileMobile');
+  const pEmail = document.getElementById('profileEmail');
+  const pCat = document.getElementById('profileCategory');
+
+  if (pName) pName.textContent = u.name;
+  if (pRole) pRole.textContent = `${u.role} Personnel`;
+  if (pMobile) pMobile.textContent = u.mobile;
+  if (pEmail) pEmail.textContent = u.email || 'N/A';
+  if (pCat) pCat.textContent = `${u.category} Category`;
+
+  document.getElementById('userProfileModal')?.classList.remove('hidden');
+}
+
+function closeUserProfileModal() {
+  document.getElementById('userProfileModal')?.classList.add('hidden');
+}
+
+
+// Dynamic Building & Floor Location Manager Functions
+function renderLocationOptions() {
+  const inputLoc = document.getElementById('inputLocation');
+  const inputFloor = document.getElementById('inputFloor');
+  const adminFilterFloor = document.getElementById('adminFilterFloor');
+  const adminBuildingsTags = document.getElementById('adminBuildingsTags');
+  const adminFloorsTags = document.getElementById('adminFloorsTags');
+
+  // Render Building Locations
+  if (inputLoc) {
+    inputLoc.innerHTML = SITE_LOCATIONS.buildings.map(b => 
+      `<option value="${b}">${b}</option>`
+    ).join('');
+  }
+
+  if (adminBuildingsTags) {
+    adminBuildingsTags.innerHTML = SITE_LOCATIONS.buildings.map(b => `
+      <span class="px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-1.5">
+        ${b}
+        <button type="button" onclick="handleDeleteBuildingLocation('${b}')" class="text-rose-400 hover:text-rose-300 ml-1 font-extrabold text-[11px]" title="Remove building tag">×</button>
+      </span>
+    `).join('');
+  }
+
+  // Render Floor Levels
+  if (inputFloor) {
+    inputFloor.innerHTML = SITE_LOCATIONS.floors.map(f => 
+      `<option value="${f}" ${f === '3rd' ? 'selected' : ''}>${f}</option>`
+    ).join('');
+  }
+
+  if (adminFilterFloor) {
+    adminFilterFloor.innerHTML = `<option value="all">All Floor Levels</option>` + SITE_LOCATIONS.floors.map(f => 
+      `<option value="${f}">${f}</option>`
+    ).join('');
+  }
+
+  if (adminFloorsTags) {
+    adminFloorsTags.innerHTML = SITE_LOCATIONS.floors.map(f => `
+      <span class="px-2.5 py-1 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 font-bold text-xs flex items-center gap-1.5">
+        ${f}
+        <button type="button" onclick="handleDeleteFloorLevel('${f}')" class="text-rose-400 hover:text-rose-300 ml-1 font-extrabold text-[11px]" title="Remove floor tag">×</button>
+      </span>
+    `).join('');
+  }
+}
+
+function handleAddBuildingLocation(e) {
+  e.preventDefault();
+  const input = document.getElementById('newBuildingInput');
+  const val = input ? input.value.trim() : '';
+  if (!val) return;
+
+  if (!SITE_LOCATIONS.buildings.includes(val)) {
+    SITE_LOCATIONS.buildings.push(val);
+    saveLocationsState();
+  }
+  if (input) input.value = '';
+}
+
+function handleDeleteBuildingLocation(bName) {
+  if (SITE_LOCATIONS.buildings.length <= 1) {
+    alert('At least one building location must remain!');
+    return;
+  }
+  SITE_LOCATIONS.buildings = SITE_LOCATIONS.buildings.filter(b => b !== bName);
+  saveLocationsState();
+}
+
+function handleAddFloorLevel(e) {
+  e.preventDefault();
+  const input = document.getElementById('newFloorInput');
+  const val = input ? input.value.trim() : '';
+  if (!val) return;
+
+  if (!SITE_LOCATIONS.floors.includes(val)) {
+    SITE_LOCATIONS.floors.push(val);
+    saveLocationsState();
+  }
+  if (input) input.value = '';
+}
+
+function handleDeleteFloorLevel(fName) {
+  if (SITE_LOCATIONS.floors.length <= 1) {
+    alert('At least one floor level must remain!');
+    return;
+  }
+  SITE_LOCATIONS.floors = SITE_LOCATIONS.floors.filter(f => f !== fName);
+  saveLocationsState();
+}
+
+function saveLocationsState() {
+  localStorage.setItem('snag_tracker_locations', JSON.stringify(SITE_LOCATIONS));
+  renderLocationOptions();
+
+  // Sync locations to Cloud Firestore
+  if (STATE.isFirebaseActive && STATE.db) {
+    STATE.db.collection('locations').doc('config').set(SITE_LOCATIONS)
+      .then(() => console.log('Location options synced to Cloud Firestore'))
+      .catch(e => console.error('Error syncing locations:', e));
   }
 }
 
@@ -1342,6 +1492,18 @@ function initializeFirebaseApp(config) {
           SYSTEM_USERS = cloudUsers;
           localStorage.setItem('snag_tracker_users', JSON.stringify(SYSTEM_USERS));
           renderUsersTable();
+        }
+      }
+    });
+
+    // Subscribe to Realtime Firestore Locations config updates
+    STATE.db.collection('locations').doc('config').onSnapshot((doc) => {
+      if (doc.exists) {
+        const data = doc.data();
+        if (data && data.buildings && data.floors) {
+          SITE_LOCATIONS = data;
+          localStorage.setItem('snag_tracker_locations', JSON.stringify(SITE_LOCATIONS));
+          renderLocationOptions();
         }
       }
     });
