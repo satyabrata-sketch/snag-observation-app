@@ -106,13 +106,7 @@
             <i class="fa-solid fa-shield-halved text-amber-400"></i> Admin Panel 🔒
           </button>
         </div>
-
-        <!-- Firebase Config Modal Trigger Button -->
-        <button onclick="openFirebaseConfigModal()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition" title="Firebase Settings & Cloud Sync">
-          <i class="fa-solid fa-gear"></i>
-        </button>
-
-      </div>
+      </div>iv>
     </div>
   </header>
 
@@ -255,8 +249,8 @@
             <i class="fa-solid fa-file-pdf text-rose-400 text-sm"></i> Export PDF Report (.pdf)
           </button>
 
-          <button onclick="lockAdminSession()" class="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center justify-center gap-1.5 transition" title="Lock Admin Session">
-            <i class="fa-solid fa-lock"></i> Lock Admin
+          <button onclick="lockAdminSession()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition" title="Lock Admin Session">
+            <i class="fa-solid fa-lock text-amber-400"></i> Lock Admin
           </button>
         </div>
       </div>
@@ -834,76 +828,6 @@
             </button>
           </div>
         </div>
-
-      </div>
-    </div>
-  </div>
-
-
-  <!-- ========================================================================= -->
-  <!-- MODAL 3: FIREBASE CONFIGURATION & CONNECTIVITY PANEL                       -->
-  <!-- ========================================================================= -->
-  <div id="firebaseModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4 overflow-y-auto">
-    <div class="glass-panel bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl max-h-[92vh] overflow-y-auto shadow-2xl relative">
-      
-      <!-- Modal Header -->
-      <div class="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-6 py-4 flex items-center justify-between z-20">
-        <h3 class="text-lg font-bold text-white flex items-center gap-2">
-          <i class="fa-solid fa-fire text-amber-500"></i> Firebase Integration Settings
-        </h3>
-        <button onclick="closeFirebaseConfigModal()" class="text-slate-400 hover:text-white text-lg">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-
-      <div class="p-6 space-y-4">
-        
-        <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 space-y-1">
-          <div class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-circle-info"></i> How Live Cloud Sync Works:</div>
-          <p>By default, this app works instantly out-of-the-box using <strong>Local Storage / IndexedDB</strong>. To connect your real live cloud database, paste your Firebase config below!</p>
-        </div>
-
-        <form id="firebaseConfigForm" onsubmit="saveFirebaseConfig(event)" class="space-y-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">API Key (apiKey)</label>
-            <input type="text" id="fbApiKey" placeholder="AIzaSy..." class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 font-mono focus:outline-none focus:border-amber-500">
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">Auth Domain (authDomain)</label>
-            <input type="text" id="fbAuthDomain" placeholder="your-app.firebaseapp.com" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 font-mono focus:outline-none focus:border-amber-500">
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">Project ID (projectId)</label>
-            <input type="text" id="fbProjectId" placeholder="your-app-id" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 font-mono focus:outline-none focus:border-amber-500">
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">Storage Bucket (storageBucket)</label>
-            <input type="text" id="fbStorageBucket" placeholder="your-app.appspot.com" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 font-mono focus:outline-none focus:border-amber-500">
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">Messaging Sender ID (messagingSenderId)</label>
-            <input type="text" id="fbMessagingSenderId" placeholder="123456789" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 font-mono focus:outline-none focus:border-amber-500">
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">App ID (appId)</label>
-            <input type="text" id="fbAppId" placeholder="1:123456789:web:abc123def" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 font-mono focus:outline-none focus:border-amber-500">
-          </div>
-
-          <div class="flex items-center justify-between pt-3 border-t border-slate-800">
-            <button type="button" onclick="clearFirebaseConfig()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-400 text-xs font-bold border border-rose-500/20">
-              Clear & Use Local Storage
-            </button>
-
-            <button type="submit" class="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow">
-              Save & Initialize Firebase
-            </button>
-          </div>
-        </form>
 
       </div>
     </div>
