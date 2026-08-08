@@ -9,7 +9,7 @@ const ADMIN_PASSWORD = 'Satya@1996';
 const STATE = {
   activeSection: 'user', // 'user' or 'admin'
   activeAdminTab: 'tracking', // 'tracking' or 'users'
-  currentPersonaKey: 'user_electrical',
+  currentUser: null, // Logged in user object
   isAdminAuthenticated: false,
   mediaStream: null,
   facingMode: 'environment', // 'user' or 'environment'
@@ -22,29 +22,17 @@ const STATE = {
   auth: null
 };
 
-// System Users Database (Default registered users mapped to expanded roles)
+// System Users Database (Pre-configured default registered users with 10-digit mobile & passwords)
 let SYSTEM_USERS = [
-  { id: 'usr_1', name: 'Rajesh Kumar', email: 'rajesh.elec@site.com', role: 'Engineer', category: 'Electrical', created: '2026-01-15' },
-  { id: 'usr_2', name: 'Vikram Mehta', email: 'vikram.bms@site.com', role: 'BMS Operator', category: 'Electrical', created: '2026-01-16' },
-  { id: 'usr_3', name: 'Suresh Patil', email: 'suresh.mst@site.com', role: 'MST', category: 'General', created: '2026-01-17' },
-  { id: 'usr_4', name: 'Amit Singh', email: 'amit.carp@site.com', role: 'Carpenter', category: 'Carpentry', created: '2026-02-01' },
-  { id: 'usr_5', name: 'Sunil Verma', email: 'sunil.plumb@site.com', role: 'Plumber', category: 'Plumbing', created: '2026-01-18' },
-  { id: 'usr_6', name: 'Ravi Sharma', email: 'ravi.paint@site.com', role: 'Painter', category: 'Painting', created: '2026-02-10' },
-  { id: 'usr_7', name: 'Anil Kapoor', email: 'anil.super@site.com', role: 'Supervisor', category: 'General', created: '2026-02-15' },
-  { id: 'usr_8', name: 'Site Safety Admin', email: 'admin@site.com', role: 'Admin', category: 'General', created: '2026-01-01' }
+  { id: 'usr_1', name: 'Rajesh Kumar', mobile: '9876543210', email: 'rajesh.elec@site.com', password: 'user123', role: 'Engineer', category: 'Electrical', created: '2026-01-15' },
+  { id: 'usr_2', name: 'Vikram Mehta', mobile: '9876543211', email: 'vikram.bms@site.com', password: 'user123', role: 'BMS Operator', category: 'Electrical', created: '2026-01-16' },
+  { id: 'usr_3', name: 'Suresh Patil', mobile: '9876543212', email: 'suresh.mst@site.com', password: 'user123', role: 'MST', category: 'General', created: '2026-01-17' },
+  { id: 'usr_4', name: 'Amit Singh', mobile: '9876543213', email: 'amit.carp@site.com', password: 'user123', role: 'Carpenter', category: 'Carpentry', created: '2026-02-01' },
+  { id: 'usr_5', name: 'Sunil Verma', mobile: '9876543214', email: 'sunil.plumb@site.com', password: 'user123', role: 'Plumber', category: 'Plumbing', created: '2026-01-18' },
+  { id: 'usr_6', name: 'Ravi Sharma', mobile: '9876543215', email: 'ravi.paint@site.com', password: 'user123', role: 'Painter', category: 'Painting', created: '2026-02-10' },
+  { id: 'usr_7', name: 'Anil Kapoor', mobile: '9876543216', email: 'anil.super@site.com', password: 'user123', role: 'Supervisor', category: 'General', created: '2026-02-15' },
+  { id: 'usr_8', name: 'Site Safety Admin', mobile: '9999999999', email: 'admin@site.com', password: 'Satya@1996', role: 'Admin', category: 'General', created: '2026-01-01' }
 ];
-
-// Persona Mapping Configuration
-const PERSONAS = {
-  user_electrical: { name: 'Rajesh Kumar', role: 'Engineer', category: 'Electrical', icon: '⚡', color: 'badge-electrical' },
-  user_bms: { name: 'Vikram Mehta', role: 'BMS Operator', category: 'Electrical', icon: '💻', color: 'badge-electrical' },
-  user_mst: { name: 'Suresh Patil', role: 'MST', category: 'General', icon: '🛠️', color: 'badge-general' },
-  user_carpentry: { name: 'Amit Singh', role: 'Carpenter', category: 'Carpentry', icon: '🪛', color: 'badge-carpentry' },
-  user_plumbing: { name: 'Sunil Verma', role: 'Plumber', category: 'Plumbing', icon: '🔧', color: 'badge-plumbing' },
-  user_painting: { name: 'Ravi Sharma', role: 'Painter', category: 'Painting', icon: '🎨', color: 'badge-painting' },
-  user_supervisor: { name: 'Anil Kapoor', role: 'Supervisor', category: 'General', icon: '📋', color: 'badge-general' },
-  admin: { name: 'Site Safety Admin', role: 'Admin', category: 'All', icon: '👑', color: 'badge-general' }
-};
 
 // Initial Snag Database (Clean empty array - zero dummy data)
 const INITIAL_SNAGS = [];
@@ -56,9 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initLiveClock();
   initLocalStorage();
   initGeolocation();
-  initPersonaSelector();
   initDefaultMonthFilter();
-  renderApp();
+  checkUserSession();
 });
 
 // Realtime Header Clock
@@ -74,7 +61,7 @@ function initLiveClock() {
   setInterval(tick, 1000);
 }
 
-// Local Storage Initializer (Clean database without dummy data)
+// Local Storage Initializer
 function initLocalStorage() {
   const savedSnags = localStorage.getItem('snag_tracker_snags');
   if (savedSnags) {
@@ -97,6 +84,13 @@ function initLocalStorage() {
     localStorage.setItem('snag_tracker_users', JSON.stringify(SYSTEM_USERS));
   }
 
+  const savedActiveUser = localStorage.getItem('snag_tracker_active_user');
+  if (savedActiveUser) {
+    try {
+      STATE.currentUser = JSON.parse(savedActiveUser);
+    } catch (e) {}
+  }
+
   // Check stored Firebase config
   const savedFb = localStorage.getItem('snag_tracker_firebase_config');
   if (savedFb) {
@@ -107,6 +101,67 @@ function initLocalStorage() {
   }
 }
 
+// User Session Gate Check
+function checkUserSession() {
+  if (!STATE.currentUser) {
+    // Default set first user if not logged in or open login modal
+    openUserAuthModal();
+  } else {
+    closeUserAuthModal();
+    renderApp();
+  }
+}
+
+// User Authentication Modal Handlers
+function openUserAuthModal() {
+  document.getElementById('userAuthModal').classList.remove('hidden');
+}
+
+function closeUserAuthModal() {
+  document.getElementById('userAuthModal').classList.add('hidden');
+}
+
+function handleUserLoginSubmit(e) {
+  e.preventDefault();
+  const idInput = document.getElementById('userLoginIdInput').value.trim();
+  const pwdInput = document.getElementById('userLoginPasswordInput').value.trim();
+
+  // Find user by 10-digit mobile OR email, AND password
+  const matchedUser = SYSTEM_USERS.find(u => 
+    (u.mobile === idInput || (u.email && u.email.toLowerCase() === idInput.toLowerCase())) &&
+    u.password === pwdInput
+  );
+
+  if (matchedUser) {
+    STATE.currentUser = matchedUser;
+    localStorage.setItem('snag_tracker_active_user', JSON.stringify(matchedUser));
+    document.getElementById('userAuthError').classList.add('hidden');
+    closeUserAuthModal();
+    
+    if (matchedUser.role === 'Admin') {
+      STATE.isAdminAuthenticated = true;
+      switchSection('admin');
+    } else {
+      switchSection('user');
+    }
+    renderApp();
+  } else {
+    document.getElementById('userAuthError').classList.remove('hidden');
+  }
+}
+
+function handleUserLogout() {
+  STATE.currentUser = null;
+  STATE.isAdminAuthenticated = false;
+  localStorage.removeItem('snag_tracker_active_user');
+  openUserAuthModal();
+}
+
+function openAdminAuthModalDirect() {
+  closeUserAuthModal();
+  openAdminAuthModal();
+}
+
 // Clear all database data function
 function clearAllDataDatabase() {
   if (confirm('Are you sure you want to clear ALL snag observation records? This action cannot be undone!')) {
@@ -114,7 +169,6 @@ function clearAllDataDatabase() {
     saveSnagsState();
 
     if (STATE.isFirebaseActive && STATE.db) {
-      // Clear Firestore collection
       STATE.db.collection('snags').get().then(snapshot => {
         snapshot.forEach(doc => doc.ref.delete());
       });
@@ -157,51 +211,39 @@ function initDefaultMonthFilter() {
   }
 }
 
-// Persona Switcher Handler
-function initPersonaSelector() {
-  const select = document.getElementById('userSelector');
-  if (select) {
-    select.addEventListener('change', (e) => {
-      const selectedVal = e.target.value;
-      if (selectedVal === 'admin') {
-        if (!STATE.isAdminAuthenticated) {
-          openAdminAuthModal();
-          select.value = STATE.currentPersonaKey;
-          return;
-        }
-        switchSection('admin');
-      } else {
-        STATE.currentPersonaKey = selectedVal;
-        switchSection('user');
-      }
-      renderApp();
-    });
-  }
-}
-
 // Main Render Dispatcher
 function renderApp() {
-  const persona = PERSONAS[STATE.currentPersonaKey];
+  if (!STATE.currentUser) return;
+
+  const curUser = STATE.currentUser;
   
+  // Update Header User Pill
+  const headerName = document.getElementById('headerUserName');
+  const headerRole = document.getElementById('headerUserRole');
+  if (headerName) headerName.textContent = curUser.name;
+  if (headerRole) headerRole.textContent = `${curUser.role} (${curUser.category})`;
+
   // Update User Banner
   const nameEl = document.getElementById('currentUserNameDisplay');
   const catBadge = document.getElementById('userCategoryBadge');
   const catText = document.getElementById('userCategoryText');
   const roleTag = document.getElementById('userRoleTag');
 
-  if (nameEl) nameEl.textContent = persona.name;
-  if (catText) catText.textContent = persona.category;
-  if (roleTag) roleTag.textContent = persona.role;
+  if (nameEl) nameEl.textContent = curUser.name;
+  if (catText) catText.textContent = curUser.category;
+  if (roleTag) roleTag.textContent = curUser.role;
 
   if (catBadge) {
-    catBadge.className = `${persona.color} px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5`;
-    catBadge.innerHTML = `<span>${persona.icon}</span> <span>${persona.category} Category</span>`;
+    const color = getCategoryBadgeClass(curUser.category);
+    const icon = getCategoryIcon(curUser.category);
+    catBadge.className = `${color} px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5`;
+    catBadge.innerHTML = `<span>${icon}</span> <span>${curUser.category} Category</span>`;
   }
 
-  // Set category dropdown default in Capture Modal to match active user persona
+  // Set category dropdown default in Capture Modal to match active user
   const inputCategory = document.getElementById('inputCategory');
-  if (inputCategory && persona.category !== 'All') {
-    inputCategory.value = persona.category;
+  if (inputCategory) {
+    inputCategory.value = curUser.category;
   }
 
   // Render feeds
@@ -246,8 +288,6 @@ function openAdminAuthModal() {
 
 function cancelAdminAuth() {
   document.getElementById('adminAuthModal').classList.add('hidden');
-  const select = document.getElementById('userSelector');
-  if (select) select.value = STATE.currentPersonaKey;
   switchSection('user');
 }
 
@@ -256,10 +296,7 @@ function handleAdminLogin(e) {
   const inputPwd = document.getElementById('adminPasswordInput').value;
   if (inputPwd === ADMIN_PASSWORD) {
     STATE.isAdminAuthenticated = true;
-    STATE.currentPersonaKey = 'admin';
     document.getElementById('adminAuthModal').classList.add('hidden');
-    const select = document.getElementById('userSelector');
-    if (select) select.value = 'admin';
     switchSection('admin');
     renderApp();
   } else {
@@ -269,9 +306,6 @@ function handleAdminLogin(e) {
 
 function lockAdminSession() {
   STATE.isAdminAuthenticated = false;
-  const select = document.getElementById('userSelector');
-  if (select) select.value = 'user_electrical';
-  STATE.currentPersonaKey = 'user_electrical';
   switchSection('user');
   renderApp();
   alert('Admin session locked!');
@@ -305,15 +339,15 @@ function switchAdminTab(tab) {
 
 function renderUserSnagsFeed() {
   const grid = document.getElementById('userSnagsGrid');
-  if (!grid) return;
+  if (!grid || !STATE.currentUser) return;
 
-  const persona = PERSONAS[STATE.currentPersonaKey];
+  const curUser = STATE.currentUser;
   const filterStatus = document.getElementById('userFilterStatus')?.value || 'all';
   const searchQuery = document.getElementById('userSearchInput')?.value?.toLowerCase() || '';
 
-  // Filter snags by active user's assigned category (Unless Admin viewing)
+  // Filter snags by logged in user's assigned category (Unless Admin viewing)
   let filtered = snagsStore.filter(snag => {
-    if (persona.category !== 'All' && snag.category !== persona.category) {
+    if (curUser.role !== 'Admin' && snag.category !== curUser.category) {
       return false;
     }
     if (filterStatus !== 'all' && snag.status !== filterStatus) {
@@ -348,7 +382,7 @@ function renderUserSnagsFeed() {
           <i class="fa-solid fa-folder-open"></i>
         </div>
         <h4 class="text-sm font-bold text-slate-300">No Snag Observations Found</h4>
-        <p class="text-xs text-slate-500">No defect observations logged in category (${persona.category}). Click "Capture & Report Snag" to add one!</p>
+        <p class="text-xs text-slate-500">No defect observations logged in category (${curUser.category}). Click "Capture & Report Snag" to add one!</p>
       </div>
     `;
     return;
@@ -700,7 +734,7 @@ function handleSaveSnag(e) {
   
   const monthYearStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-  const persona = PERSONAS[STATE.currentPersonaKey];
+  const curUser = STATE.currentUser || { name: 'Inspector', role: 'Engineer', category: 'General' };
 
   const newSnag = {
     id: `SNAG-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -713,7 +747,7 @@ function handleSaveSnag(e) {
     priority: document.getElementById('inputPriority').value,
     status: document.getElementById('inputStatus').value,
     description: document.getElementById('inputDescription').value,
-    assignedUser: `${persona.name} (${persona.role} - ${persona.category})`,
+    assignedUser: `${curUser.name} (${curUser.role} - ${curUser.category})`,
     gps: STATE.userGps.text,
     photo: STATE.capturedPhotoDataUrl
   };
@@ -811,15 +845,24 @@ function saveDetailStatusUpdate() {
 
 function handleCreateUser(e) {
   e.preventDefault();
-  const name = document.getElementById('newUserName').value;
-  const email = document.getElementById('newUserEmail').value;
+  const name = document.getElementById('newUserName').value.trim();
+  const mobile = document.getElementById('newUserMobile').value.trim();
+  const email = document.getElementById('newUserEmail').value.trim();
+  const password = document.getElementById('newUserPassword').value.trim();
   const role = document.getElementById('newUserRole').value;
   const category = document.getElementById('newUserCategory').value;
+
+  if (!/^[0-9]{10}$/.test(mobile)) {
+    alert('Please enter a valid 10-digit mobile number!');
+    return;
+  }
 
   const newUser = {
     id: `usr_${Date.now()}`,
     name,
-    email,
+    mobile,
+    email: email || 'N/A',
+    password,
     role,
     category,
     created: new Date().toISOString().split('T')[0]
@@ -830,9 +873,11 @@ function handleCreateUser(e) {
 
   // Reset Form
   document.getElementById('newUserName').value = '';
+  document.getElementById('newUserMobile').value = '';
   document.getElementById('newUserEmail').value = '';
+  document.getElementById('newUserPassword').value = '';
   renderUsersTable();
-  alert(`User ${name} created with role "${role}" and assigned to ${category} category!`);
+  alert(`User "${name}" created!\nMobile: ${mobile}\nPassword: ${password}`);
 }
 
 function renderUsersTable() {
@@ -848,6 +893,7 @@ function renderUsersTable() {
       <tr class="hover:bg-slate-800/40">
         <td class="px-3 py-2.5">
           <div class="font-bold text-white text-xs">${usr.name}</div>
+          <div class="text-[10px] text-cyan-400 font-mono"><i class="fa-solid fa-phone text-[9px] mr-1"></i>${usr.mobile}</div>
           <div class="text-[10px] text-slate-400">${usr.email}</div>
         </td>
         <td class="px-3 py-2.5">
@@ -860,7 +906,10 @@ function renderUsersTable() {
             ${usr.category}
           </span>
         </td>
-        <td class="px-3 py-2.5">
+        <td class="px-3 py-2.5 font-mono text-xs text-amber-300">
+          <span class="bg-slate-900 px-2 py-0.5 rounded border border-slate-700">${usr.password}</span>
+        </td>
+        <td class="px-3 py-2.5 text-right">
           <button onclick="deleteUserRecord('${usr.id}')" class="text-xs text-rose-400 hover:text-rose-300 font-semibold" title="Delete user">
             <i class="fa-solid fa-trash"></i>
           </button>
