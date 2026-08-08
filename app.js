@@ -2,11 +2,15 @@
    Snag Observation & Management System - Core Application Logic
    ========================================================================== */
 
+// Admin Password Constant
+const ADMIN_PASSWORD = 'Satya@1996';
+
 // Global Application State
 const STATE = {
   activeSection: 'user', // 'user' or 'admin'
   activeAdminTab: 'tracking', // 'tracking' or 'users'
   currentPersonaKey: 'user_electrical',
+  isAdminAuthenticated: false,
   mediaStream: null,
   facingMode: 'environment', // 'user' or 'environment'
   capturedPhotoDataUrl: null,
@@ -18,7 +22,7 @@ const STATE = {
   auth: null
 };
 
-// System Users Database (Default initial users)
+// System Users Database (Default registered users)
 let SYSTEM_USERS = [
   { id: 'usr_1', name: 'Rajesh Kumar', email: 'rajesh.elec@site.com', role: 'Technician', category: 'Electrical', created: '2026-01-15' },
   { id: 'usr_2', name: 'Sunil Verma', email: 'sunil.plumb@site.com', role: 'Technician', category: 'Plumbing', created: '2026-01-18' },
@@ -38,69 +42,8 @@ const PERSONAS = {
   user_general: { name: 'Pooja Nair', role: 'Technician', category: 'General', icon: '📦', color: 'badge-general' }
 };
 
-// Initial Default Sample Snag Observations Dataset
-const INITIAL_SNAGS = [
-  {
-    id: 'SNAG-2026-0801',
-    timestamp: '2026-08-08 14:30:15',
-    monthYear: '2026-08',
-    location: 'Tower A - Main Building',
-    floor: '2nd Floor',
-    area: 'Electrical DB Room 204',
-    category: 'Electrical',
-    priority: 'High',
-    status: 'Open',
-    description: 'Exposed wire termination near circuit breaker CB14. Cable tag loose and ground bonding wire missing.',
-    assignedUser: 'Rajesh Kumar (Electrical)',
-    gps: '12.9716° N, 77.5946° E',
-    photo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="100%" height="100%" fill="%231e293b"/><path d="M150 100 h300 v200 h-300 z" fill="%230f172a" stroke="%23f59e0b" stroke-width="4"/><text x="300" y="180" font-family="sans-serif" font-size="20" fill="%23fbbf24" text-anchor="middle">⚡ ELECTRICAL PANEL DEFECT</text><text x="300" y="220" font-family="sans-serif" font-size="14" fill="%2394a3b8" text-anchor="middle">Location: Tower A, 2nd Floor (DB-204)</text><rect x="0" y="340" width="600" height="60" fill="%23090d16"/><text x="20" y="375" font-family="monospace" font-size="14" fill="%2338bdf8">DATE: 2026-08-08 14:30 | GPS: 12.9716 N, 77.5946 E</text></svg>'
-  },
-  {
-    id: 'SNAG-2026-0802',
-    timestamp: '2026-08-08 11:15:40',
-    monthYear: '2026-08',
-    location: 'Tower B - Commercial',
-    floor: '1st Floor',
-    area: 'Restroom Wet Area B',
-    category: 'Plumbing',
-    priority: 'Medium',
-    status: 'In Progress',
-    description: 'Minor water seepage observed at PVC pipe elbow joint under sink counter. Gasket needs replacement.',
-    assignedUser: 'Sunil Verma (Plumbing)',
-    gps: '12.9718° N, 77.5948° E',
-    photo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="100%" height="100%" fill="%230f172a"/><path d="M200 120 h200 v160 h-200 z" fill="%231e293b" stroke="%2306b6d4" stroke-width="4"/><text x="300" y="180" font-family="sans-serif" font-size="20" fill="%2338bdf8" text-anchor="middle">🔧 PLUMBING LEAK DEFECT</text><text x="300" y="220" font-family="sans-serif" font-size="14" fill="%2394a3b8" text-anchor="middle">Location: Tower B, 1st Floor Restroom</text><rect x="0" y="340" width="600" height="60" fill="%23090d16"/><text x="20" y="375" font-family="monospace" font-size="14" fill="%2338bdf8">DATE: 2026-08-08 11:15 | GPS: 12.9718 N, 77.5948 E</text></svg>'
-  },
-  {
-    id: 'SNAG-2026-0803',
-    timestamp: '2026-08-07 16:45:10',
-    monthYear: '2026-08',
-    location: 'Podium Plaza',
-    floor: 'Ground Floor',
-    area: 'Main Entrance Fire Door',
-    category: 'Carpentry',
-    priority: 'High',
-    status: 'Open',
-    description: 'Fire exit door frame misaligned; door leaf scraping bottom threshold. Needs hinge adjustment and trimming.',
-    assignedUser: 'Amit Singh (Carpentry)',
-    gps: '12.9715° N, 77.5945° E',
-    photo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="100%" height="100%" fill="%2318181b"/><path d="M180 80 h240 v240 h-240 z" fill="%2327272a" stroke="%23f59e0b" stroke-width="4"/><text x="300" y="180" font-family="sans-serif" font-size="20" fill="%23fbbf24" text-anchor="middle">🪛 DOOR ALIGNMENT SNAG</text><text x="300" y="220" font-family="sans-serif" font-size="14" fill="%23a1a1aa" text-anchor="middle">Location: Podium Plaza, Ground Entrance</text><rect x="0" y="340" width="600" height="60" fill="%23090d16"/><text x="20" y="375" font-family="monospace" font-size="14" fill="%2338bdf8">DATE: 2026-08-07 16:45 | GPS: 12.9715 N, 77.5945 E</text></svg>'
-  },
-  {
-    id: 'SNAG-2026-0701',
-    timestamp: '2026-07-28 10:20:00',
-    monthYear: '2026-07',
-    location: 'Tower A - Main Building',
-    floor: '3rd Floor',
-    area: 'Executive Lobby Corridor',
-    category: 'Painting',
-    priority: 'Low',
-    status: 'Resolved',
-    description: 'Uneven primer coat and drywall patch visible under wall lighting near Elevator B. Touchup paint completed.',
-    assignedUser: 'Ravi Sharma (Painting)',
-    gps: '12.9716° N, 77.5946° E',
-    photo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="100%" height="100%" fill="%231e1b4b"/><path d="M150 100 h300 v200 h-300 z" fill="%23312e81" stroke="%23c084fc" stroke-width="4"/><text x="300" y="180" font-family="sans-serif" font-size="20" fill="%23e879f9" text-anchor="middle">🎨 WALL PAINT PATCH DEFECT</text><text x="300" y="220" font-family="sans-serif" font-size="14" fill="%23cbd5e1" text-anchor="middle">Location: Tower A, 3rd Floor Lobby</text><rect x="0" y="340" width="600" height="60" fill="%23090d16"/><text x="20" y="375" font-family="monospace" font-size="14" fill="%2338bdf8">DATE: 2026-07-28 10:20 | GPS: 12.9716 N, 77.5946 E</text></svg>'
-  }
-];
+// Initial Snag Database (Clean empty array - zero dummy data)
+const INITIAL_SNAGS = [];
 
 let snagsStore = [];
 
@@ -127,17 +70,17 @@ function initLiveClock() {
   setInterval(tick, 1000);
 }
 
-// Local Storage Initializer
+// Local Storage Initializer (Clean database without dummy data)
 function initLocalStorage() {
   const savedSnags = localStorage.getItem('snag_tracker_snags');
   if (savedSnags) {
     try {
       snagsStore = JSON.parse(savedSnags);
     } catch (e) {
-      snagsStore = INITIAL_SNAGS;
+      snagsStore = [];
     }
   } else {
-    snagsStore = INITIAL_SNAGS;
+    snagsStore = [];
     localStorage.setItem('snag_tracker_snags', JSON.stringify(snagsStore));
   }
 
@@ -157,6 +100,24 @@ function initLocalStorage() {
       const config = JSON.parse(savedFb);
       initializeFirebaseApp(config);
     } catch (e) {}
+  }
+}
+
+// Clear all database data function
+function clearAllDataDatabase() {
+  if (confirm('Are you sure you want to clear ALL snag observation records? This action cannot be undone!')) {
+    snagsStore = [];
+    saveSnagsState();
+
+    if (STATE.isFirebaseActive && STATE.db) {
+      // Clear Firestore collection
+      STATE.db.collection('snags').get().then(snapshot => {
+        snapshot.forEach(doc => doc.ref.delete());
+      });
+    }
+
+    renderApp();
+    alert('All observation data cleared successfully!');
   }
 }
 
@@ -197,13 +158,17 @@ function initPersonaSelector() {
   const select = document.getElementById('userSelector');
   if (select) {
     select.addEventListener('change', (e) => {
-      STATE.currentPersonaKey = e.target.value;
-      const persona = PERSONAS[STATE.currentPersonaKey];
-
-      // Auto switch section if admin is selected vs user
-      if (e.target.value === 'admin') {
+      const selectedVal = e.target.value;
+      if (selectedVal === 'admin') {
+        if (!STATE.isAdminAuthenticated) {
+          openAdminAuthModal();
+          // Reset dropdown to previous persona until authenticated
+          select.value = STATE.currentPersonaKey;
+          return;
+        }
         switchSection('admin');
       } else {
+        STATE.currentPersonaKey = selectedVal;
         switchSection('user');
       }
       renderApp();
@@ -243,8 +208,13 @@ function renderApp() {
 }
 
 
-// Switch Main Section (User vs Admin)
+// Switch Main Section (User vs Admin Password Protected)
 function switchSection(section) {
+  if (section === 'admin' && !STATE.isAdminAuthenticated) {
+    openAdminAuthModal();
+    return;
+  }
+
   STATE.activeSection = section;
   const userSec = document.getElementById('userSection');
   const adminSec = document.getElementById('adminSection');
@@ -262,6 +232,46 @@ function switchSection(section) {
     navAdminBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-blue-600 text-white shadow';
     navUserBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white';
   }
+}
+
+// ADMIN AUTHENTICATION LOGIC (Password: Satya@1996)
+function openAdminAuthModal() {
+  document.getElementById('adminPasswordInput').value = '';
+  document.getElementById('adminAuthError').classList.add('hidden');
+  document.getElementById('adminAuthModal').classList.remove('hidden');
+}
+
+function cancelAdminAuth() {
+  document.getElementById('adminAuthModal').classList.add('hidden');
+  const select = document.getElementById('userSelector');
+  if (select) select.value = STATE.currentPersonaKey;
+  switchSection('user');
+}
+
+function handleAdminLogin(e) {
+  e.preventDefault();
+  const inputPwd = document.getElementById('adminPasswordInput').value;
+  if (inputPwd === ADMIN_PASSWORD) {
+    STATE.isAdminAuthenticated = true;
+    STATE.currentPersonaKey = 'admin';
+    document.getElementById('adminAuthModal').classList.add('hidden');
+    const select = document.getElementById('userSelector');
+    if (select) select.value = 'admin';
+    switchSection('admin');
+    renderApp();
+  } else {
+    document.getElementById('adminAuthError').classList.remove('hidden');
+  }
+}
+
+function lockAdminSession() {
+  STATE.isAdminAuthenticated = false;
+  const select = document.getElementById('userSelector');
+  if (select) select.value = 'user_electrical';
+  STATE.currentPersonaKey = 'user_electrical';
+  switchSection('user');
+  renderApp();
+  alert('Admin session locked!');
 }
 
 // Switch Admin Internal Tabs (Tracking vs Users)
@@ -334,8 +344,8 @@ function renderUserSnagsFeed() {
         <div class="w-12 h-12 rounded-full bg-slate-800 text-slate-500 flex items-center justify-center mx-auto text-xl">
           <i class="fa-solid fa-folder-open"></i>
         </div>
-        <h4 class="text-sm font-bold text-slate-300">No Snags Found</h4>
-        <p class="text-xs text-slate-500">No observation snags logged in category (${persona.category}) matching filters.</p>
+        <h4 class="text-sm font-bold text-slate-300">No Snag Observations Found</h4>
+        <p class="text-xs text-slate-500">No defect observations logged in category (${persona.category}). Click "Capture & Report Snag" to add one!</p>
       </div>
     `;
     return;
@@ -412,16 +422,15 @@ function renderAdminSnagsTable() {
   const tbody = document.getElementById('adminSnagsTableBody');
   if (!tbody) return;
 
-  const monthFilter = document.getElementById('adminFilterMonth')?.value; // '2026-08'
+  const monthFilter = document.getElementById('adminFilterMonth')?.value;
   const categoryFilter = document.getElementById('adminFilterCategory')?.value || 'all';
   const statusFilter = document.getElementById('adminFilterStatus')?.value || 'all';
   const floorFilter = document.getElementById('adminFilterFloor')?.value || 'all';
   const searchQuery = document.getElementById('adminSearchInput')?.value?.toLowerCase() || '';
 
   let filtered = snagsStore.filter(snag => {
-    // Month Filter (Match YYYY-MM)
     if (monthFilter) {
-      const snagMonth = snag.timestamp.substring(0, 7); // '2026-08'
+      const snagMonth = snag.timestamp.substring(0, 7);
       if (snagMonth !== monthFilter) return false;
     }
     if (categoryFilter !== 'all' && snag.category !== categoryFilter) return false;
@@ -882,7 +891,6 @@ function exportToExcel() {
   const categoryFilter = document.getElementById('adminFilterCategory')?.value || 'all';
   const statusFilter = document.getElementById('adminFilterStatus')?.value || 'all';
 
-  // Filter snags for report
   let filtered = snagsStore.filter(snag => {
     if (monthFilter && snag.timestamp.substring(0, 7) !== monthFilter) return false;
     if (categoryFilter !== 'all' && snag.category !== categoryFilter) return false;
@@ -895,7 +903,6 @@ function exportToExcel() {
     return;
   }
 
-  // Format data rows for Excel
   const dataRows = filtered.map((snag, idx) => ({
     'S.No': idx + 1,
     'Snag ID': snag.id,
@@ -948,10 +955,10 @@ function exportToPDF() {
   const pageWidth = doc.internal.pageSize.getWidth();
 
   // Title Banner
-  doc.setFillColor(15, 23, 42); // Dark slate
+  doc.setFillColor(15, 23, 42);
   doc.rect(0, 0, pageWidth, 32, 'F');
 
-  doc.setTextColor(6, 182, 212); // Cyan
+  doc.setTextColor(6, 182, 212);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
   doc.text('SITE SNAG OBSERVATION & COMPLIANCE AUDIT REPORT', 14, 15);
@@ -1005,17 +1012,15 @@ function exportToPDF() {
   });
 
   // Attach Photo Gallery Pages
-  filtered.forEach((snag, idx) => {
+  filtered.forEach((snag) => {
     doc.addPage();
 
-    // Header for photo card page
     doc.setFillColor(15, 23, 42);
     doc.rect(0, 0, pageWidth, 20, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(12);
     doc.text(`SNAG PHOTO EVIDENCE ATTACHMENT - ${snag.id}`, 14, 13);
 
-    // Metadata Box
     doc.setFillColor(241, 245, 249);
     doc.roundedRect(14, 26, pageWidth - 28, 40, 2, 2, 'FD');
     
@@ -1030,7 +1035,6 @@ function exportToPDF() {
     doc.text(`Captured Date & Time: ${snag.timestamp} | GPS: ${snag.gps}`, 18, 50);
     doc.text(`Assigned Specialist: ${snag.assignedUser}`, 18, 58);
 
-    // Embed Stamped Photo Image
     try {
       doc.addImage(snag.photo, 'JPEG', 14, 72, pageWidth - 28, 110);
     } catch (e) {
@@ -1039,7 +1043,6 @@ function exportToPDF() {
       doc.text('[Image attached as DataURL - displayed in digital view]', 14, 80);
     }
 
-    // Observation Remarks Box
     doc.setFillColor(255, 255, 255);
     doc.rect(14, 188, pageWidth - 28, 40, 'F');
     doc.setDrawColor(203, 213, 225);
@@ -1130,11 +1133,9 @@ function initializeFirebaseApp(config) {
       snapshot.forEach(doc => {
         cloudSnags.push(doc.data());
       });
-      if (cloudSnags.length > 0) {
-        snagsStore = cloudSnags;
-        saveSnagsState();
-        renderApp();
-      }
+      snagsStore = cloudSnags;
+      saveSnagsState();
+      renderApp();
     });
 
   } catch (err) {
