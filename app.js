@@ -88,17 +88,16 @@ function initLocalStorage() {
     localStorage.setItem('snag_tracker_snags', JSON.stringify(snagsStore));
   }
 
-  const savedLocs = localStorage.getItem('snag_tracker_locations');
-  if (savedLocs) {
-    try {
-      const parsedLocs = JSON.parse(savedLocs);
-      if (parsedLocs && parsedLocs.buildings && parsedLocs.floors) {
-        SITE_LOCATIONS = parsedLocs;
-      }
-    } catch (e) {}
-  } else {
-    localStorage.setItem('snag_tracker_locations', JSON.stringify(SITE_LOCATIONS));
-  }
+  // Strictly enforce NAB-DT3 and NAB-DT4 buildings and their specific floor mappings
+  SITE_LOCATIONS = {
+    buildings: ['NAB-DT3', 'NAB-DT4'],
+    floors: ['1st', '3rd', '4th', '5th', '6th'],
+    buildingFloors: {
+      'NAB-DT3': ['3rd'],
+      'NAB-DT4': ['1st', '4th', '5th', '6th']
+    }
+  };
+  localStorage.setItem('snag_tracker_locations', JSON.stringify(SITE_LOCATIONS));
 
   const savedUsers = localStorage.getItem('snag_tracker_users');
   if (savedUsers) {
@@ -227,20 +226,17 @@ function closeUserProfileModal() {
 }
 
 
-// Dynamic Building & Floor Location Manager Functions
+// Dynamic Building & Floor Location Manager Functions (Strictly NAB-DT3 and NAB-DT4)
 function handleBuildingLocationChange(selectedBuilding) {
   const inputFloor = document.getElementById('inputFloor');
   if (!inputFloor) return;
 
   let availableFloors = [];
-  if (selectedBuilding === 'NAB-DT3' || selectedBuilding === 'NAB' || selectedBuilding === 'DT3') {
-    availableFloors = ['3rd'];
-  } else if (selectedBuilding === 'NAB-DT4') {
+  if (selectedBuilding === 'NAB-DT4') {
     availableFloors = ['1st', '4th', '5th', '6th'];
-  } else if (SITE_LOCATIONS.buildingFloors && SITE_LOCATIONS.buildingFloors[selectedBuilding]) {
-    availableFloors = SITE_LOCATIONS.buildingFloors[selectedBuilding];
   } else {
-    availableFloors = SITE_LOCATIONS.floors || ['1st', '3rd', '4th', '5th', '6th'];
+    // NAB-DT3 (default)
+    availableFloors = ['3rd'];
   }
 
   inputFloor.innerHTML = availableFloors.map((f, idx) => 
