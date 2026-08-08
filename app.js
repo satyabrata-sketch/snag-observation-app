@@ -22,16 +22,9 @@ const STATE = {
   auth: null
 };
 
-// System Users Database (Pre-configured default registered users with 10-digit mobile & passwords)
+// Registered System Users Database (Clean initial database - default single Admin account)
 let SYSTEM_USERS = [
-  { id: 'usr_1', name: 'Rajesh Kumar', mobile: '9876543210', email: 'rajesh.elec@site.com', password: 'user123', role: 'Engineer', category: 'Electrical', created: '2026-01-15' },
-  { id: 'usr_2', name: 'Vikram Mehta', mobile: '9876543211', email: 'vikram.bms@site.com', password: 'user123', role: 'BMS Operator', category: 'Electrical', created: '2026-01-16' },
-  { id: 'usr_3', name: 'Suresh Patil', mobile: '9876543212', email: 'suresh.mst@site.com', password: 'user123', role: 'MST', category: 'General', created: '2026-01-17' },
-  { id: 'usr_4', name: 'Amit Singh', mobile: '9876543213', email: 'amit.carp@site.com', password: 'user123', role: 'Carpenter', category: 'Carpentry', created: '2026-02-01' },
-  { id: 'usr_5', name: 'Sunil Verma', mobile: '9876543214', email: 'sunil.plumb@site.com', password: 'user123', role: 'Plumber', category: 'Plumbing', created: '2026-01-18' },
-  { id: 'usr_6', name: 'Ravi Sharma', mobile: '9876543215', email: 'ravi.paint@site.com', password: 'user123', role: 'Painter', category: 'Painting', created: '2026-02-10' },
-  { id: 'usr_7', name: 'Anil Kapoor', mobile: '9876543216', email: 'anil.super@site.com', password: 'user123', role: 'Supervisor', category: 'General', created: '2026-02-15' },
-  { id: 'usr_8', name: 'Site Safety Admin', mobile: '9999999999', email: 'admin@site.com', password: 'Satya@1996', role: 'Admin', category: 'General', created: '2026-01-01' }
+  { id: 'usr_admin', name: 'Site Admin Manager', mobile: '9999999999', email: 'admin@site.com', password: 'Satya@1996', role: 'Admin', category: 'General', created: '2026-01-01' }
 ];
 
 // Initial Snag Database (Clean empty array - zero dummy data)
@@ -78,7 +71,10 @@ function initLocalStorage() {
   const savedUsers = localStorage.getItem('snag_tracker_users');
   if (savedUsers) {
     try {
-      SYSTEM_USERS = JSON.parse(savedUsers);
+      const parsed = JSON.parse(savedUsers);
+      if (parsed && parsed.length > 0) {
+        SYSTEM_USERS = parsed;
+      }
     } catch (e) {}
   } else {
     localStorage.setItem('snag_tracker_users', JSON.stringify(SYSTEM_USERS));
@@ -88,6 +84,9 @@ function initLocalStorage() {
   if (savedActiveUser) {
     try {
       STATE.currentUser = JSON.parse(savedActiveUser);
+      if (STATE.currentUser && STATE.currentUser.role === 'Admin') {
+        STATE.isAdminAuthenticated = true;
+      }
     } catch (e) {}
   }
 
@@ -104,16 +103,24 @@ function initLocalStorage() {
 // User Session Gate Check
 function checkUserSession() {
   if (!STATE.currentUser) {
-    // Default set first user if not logged in or open login modal
     openUserAuthModal();
   } else {
     closeUserAuthModal();
+    if (STATE.currentUser.role === 'Admin') {
+      STATE.isAdminAuthenticated = true;
+      switchSection('admin');
+    } else {
+      switchSection('user');
+    }
     renderApp();
   }
 }
 
 // User Authentication Modal Handlers
 function openUserAuthModal() {
+  document.getElementById('userLoginIdInput').value = '';
+  document.getElementById('userLoginPasswordInput').value = '';
+  document.getElementById('userAuthError').classList.add('hidden');
   document.getElementById('userAuthModal').classList.remove('hidden');
 }
 
@@ -138,10 +145,12 @@ function handleUserLoginSubmit(e) {
     document.getElementById('userAuthError').classList.add('hidden');
     closeUserAuthModal();
     
+    // Admin Role Routing Logic
     if (matchedUser.role === 'Admin') {
       STATE.isAdminAuthenticated = true;
       switchSection('admin');
     } else {
+      STATE.isAdminAuthenticated = false;
       switchSection('user');
     }
     renderApp();
@@ -223,6 +232,16 @@ function renderApp() {
   if (headerName) headerName.textContent = curUser.name;
   if (headerRole) headerRole.textContent = `${curUser.role} (${curUser.category})`;
 
+  // Admin Tab Visibility Control (Show Admin tab only if user has Admin role or Admin authenticated)
+  const navAdminBtn = document.getElementById('navAdminTab');
+  if (navAdminBtn) {
+    if (curUser.role === 'Admin' || STATE.isAdminAuthenticated) {
+      navAdminBtn.classList.remove('hidden');
+    } else {
+      navAdminBtn.classList.add('hidden');
+    }
+  }
+
   // Update User Banner
   const nameEl = document.getElementById('currentUserNameDisplay');
   const catBadge = document.getElementById('userCategoryBadge');
@@ -255,7 +274,7 @@ function renderApp() {
 
 // Switch Main Section (User vs Admin Password Protected)
 function switchSection(section) {
-  if (section === 'admin' && !STATE.isAdminAuthenticated) {
+  if (section === 'admin' && (!STATE.isAdminAuthenticated && STATE.currentUser?.role !== 'Admin')) {
     openAdminAuthModal();
     return;
   }
@@ -296,6 +315,10 @@ function handleAdminLogin(e) {
   const inputPwd = document.getElementById('adminPasswordInput').value;
   if (inputPwd === ADMIN_PASSWORD) {
     STATE.isAdminAuthenticated = true;
+    if (!STATE.currentUser) {
+      STATE.currentUser = SYSTEM_USERS.find(u => u.role === 'Admin') || { name: 'Site Admin Manager', role: 'Admin', category: 'General' };
+      localStorage.setItem('snag_tracker_active_user', JSON.stringify(STATE.currentUser));
+    }
     document.getElementById('adminAuthModal').classList.add('hidden');
     switchSection('admin');
     renderApp();
@@ -877,7 +900,7 @@ function handleCreateUser(e) {
   document.getElementById('newUserEmail').value = '';
   document.getElementById('newUserPassword').value = '';
   renderUsersTable();
-  alert(`User "${name}" created!\nMobile: ${mobile}\nPassword: ${password}`);
+  alert(`User "${name}" created!\nMobile: ${mobile}\nPassword: ${password}\nRole: ${role}`);
 }
 
 function renderUsersTable() {
@@ -897,7 +920,7 @@ function renderUsersTable() {
           <div class="text-[10px] text-slate-400">${usr.email}</div>
         </td>
         <td class="px-3 py-2.5">
-          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${usr.role === 'Admin' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'}">
             ${usr.role}
           </span>
         </td>
@@ -910,13 +933,33 @@ function renderUsersTable() {
           <span class="bg-slate-900 px-2 py-0.5 rounded border border-slate-700">${usr.password}</span>
         </td>
         <td class="px-3 py-2.5 text-right">
-          <button onclick="deleteUserRecord('${usr.id}')" class="text-xs text-rose-400 hover:text-rose-300 font-semibold" title="Delete user">
-            <i class="fa-solid fa-trash"></i>
-          </button>
+          <div class="flex items-center justify-end gap-2">
+            <button onclick="impersonateUser('${usr.id}')" class="px-2 py-1 rounded bg-slate-800 hover:bg-cyan-600/30 text-cyan-300 text-[10px] font-bold border border-cyan-500/30 transition" title="Preview as this User">
+              <i class="fa-solid fa-eye mr-1"></i> View User
+            </button>
+            <button onclick="deleteUserRecord('${usr.id}')" class="p-1 rounded bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 text-xs transition" title="Delete user">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
         </td>
       </tr>
     `;
   }).join('');
+}
+
+function impersonateUser(userId) {
+  const targetUser = SYSTEM_USERS.find(u => u.id === userId);
+  if (targetUser) {
+    STATE.currentUser = targetUser;
+    if (targetUser.role === 'Admin') {
+      STATE.isAdminAuthenticated = true;
+      switchSection('admin');
+    } else {
+      switchSection('user');
+    }
+    renderApp();
+    alert(`Switched active view to user: ${targetUser.name} (${targetUser.role} - ${targetUser.category})`);
+  }
 }
 
 function deleteUserRecord(userId) {
