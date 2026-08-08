@@ -5,6 +5,16 @@
 // Admin Password Constant
 const ADMIN_PASSWORD = 'Satya@1996';
 
+// Permanent Default Firebase Configuration (Fresh Project: snag-tracker-9fae8)
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBLCFUqrtnfBkuSc2oRsSJULhYtQHk0SXI",
+  authDomain: "snag-tracker-9fae8.firebaseapp.com",
+  projectId: "snag-tracker-9fae8",
+  storageBucket: "snag-tracker-9fae8.firebasestorage.app",
+  messagingSenderId: "492381139800",
+  appId: "1:492381139800:web:7358dd1cda7f21a67c6b2d"
+};
+
 // Global Application State
 const STATE = {
   activeSection: 'user', // 'user' or 'admin'
@@ -99,13 +109,11 @@ function initLocalStorage() {
     } catch (e) {}
   }
 
-  // Check stored Firebase config
-  const savedFb = localStorage.getItem('snag_tracker_firebase_config');
-  if (savedFb) {
-    try {
-      const config = JSON.parse(savedFb);
-      initializeFirebaseApp(config);
-    } catch (e) {}
+  // Auto-connect default hardcoded Firebase config (snag-tracker-9fae8)
+  const fbConfig = DEFAULT_FIREBASE_CONFIG;
+  if (fbConfig && fbConfig.apiKey) {
+    localStorage.setItem('snag_tracker_firebase_config', JSON.stringify(fbConfig));
+    initializeFirebaseApp(fbConfig);
   }
 }
 
@@ -293,17 +301,20 @@ function switchSection(section) {
   const adminSec = document.getElementById('adminSection');
   const navUserBtn = document.getElementById('navUserTab');
   const navAdminBtn = document.getElementById('navAdminTab');
+  const btnFbConfig = document.getElementById('btnFirebaseConfig');
 
   if (section === 'user') {
     userSec.classList.remove('hidden');
     adminSec.classList.add('hidden');
     navUserBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-cyan-600 text-white shadow';
     navAdminBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white';
+    if (btnFbConfig) btnFbConfig.classList.add('hidden');
   } else {
     userSec.classList.add('hidden');
     adminSec.classList.remove('hidden');
     navAdminBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-blue-600 text-white shadow';
     navUserBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white';
+    if (btnFbConfig) btnFbConfig.classList.remove('hidden');
   }
 }
 
@@ -656,15 +667,28 @@ function stopWebcamStream() {
   if (overlay) overlay.classList.add('hidden');
 }
 
-// Draw Photo Frame to Canvas & Apply Stamp Overlay
+// Draw Photo Frame to Canvas & Apply Stamp Overlay (Compressed for Cloud Firestore)
 function takeCameraSnap() {
   const video = document.getElementById('webcamVideo');
   const canvas = document.getElementById('snapshotCanvas');
   const ctx = canvas.getContext('2d');
   const retakeBtn = document.getElementById('retakeOverlay');
 
-  canvas.width = video.videoWidth || 800;
-  canvas.height = video.videoHeight || 600;
+  const maxDim = 640;
+  let w = video.videoWidth || 640;
+  let h = video.videoHeight || 480;
+  if (w > maxDim || h > maxDim) {
+    if (w > h) {
+      h = Math.round((h * maxDim) / w);
+      w = maxDim;
+    } else {
+      w = Math.round((w * maxDim) / h);
+      h = maxDim;
+    }
+  }
+
+  canvas.width = w;
+  canvas.height = h;
 
   // Draw Camera Frame
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -672,7 +696,7 @@ function takeCameraSnap() {
   // Apply Real-Time Date, Time & GPS Stamp Overlay
   stampCanvasMetadata(canvas, ctx);
 
-  STATE.capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+  STATE.capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.6);
 
   stopWebcamStream();
   canvas.classList.remove('hidden');
@@ -692,13 +716,26 @@ function handleFileInput(e) {
       const placeholder = document.getElementById('cameraPlaceholder');
       const retakeBtn = document.getElementById('retakeOverlay');
 
-      canvas.width = img.width || 800;
-      canvas.height = img.height || 600;
+      const maxDim = 640;
+      let w = img.width || 640;
+      let h = img.height || 480;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+      }
+
+      canvas.width = w;
+      canvas.height = h;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
       stampCanvasMetadata(canvas, ctx);
 
-      STATE.capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      STATE.capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.6);
       placeholder.classList.add('hidden');
       canvas.classList.remove('hidden');
       retakeBtn.classList.remove('hidden');
@@ -791,8 +828,13 @@ function handleSaveSnag(e) {
   // Sync to Firebase if active
   if (STATE.isFirebaseActive && STATE.db) {
     STATE.db.collection('snags').doc(newSnag.id).set(newSnag)
-      .then(() => console.log('Snag synced to Firebase Firestore'))
-      .catch(err => console.error('Firebase save error:', err));
+      .then(() => {
+        console.log('✅ Snag synced to Firebase Firestore successfully');
+      })
+      .catch(err => {
+        console.error('❌ Firebase snag save error:', err);
+        alert('⚠️ Cloud Sync Error: ' + err.message + '\n\nMake sure your Firestore Rules in Firebase Console allow write operations!');
+      });
   }
 
   closeCaptureModal();
@@ -903,6 +945,18 @@ function handleCreateUser(e) {
   SYSTEM_USERS.push(newUser);
   localStorage.setItem('snag_tracker_users', JSON.stringify(SYSTEM_USERS));
 
+  // Sync user to Firebase if active
+  if (STATE.isFirebaseActive && STATE.db) {
+    STATE.db.collection('users').doc(newUser.id).set(newUser)
+      .then(() => {
+        console.log('User synced to Firebase Firestore');
+      })
+      .catch(err => {
+        console.error('Firebase user save error:', err);
+        alert('⚠️ Firebase Cloud Write Blocked: ' + err.message + '\n\nFix: Make sure Firestore Rules allow read/write in Firebase Console -> Firestore Database -> Rules!');
+      });
+  }
+
   // Reset Form
   document.getElementById('newUserName').value = '';
   document.getElementById('newUserMobile').value = '';
@@ -975,6 +1029,10 @@ function deleteUserRecord(userId) {
   if (confirm('Delete this user?')) {
     SYSTEM_USERS = SYSTEM_USERS.filter(u => u.id !== userId);
     localStorage.setItem('snag_tracker_users', JSON.stringify(SYSTEM_USERS));
+
+    if (STATE.isFirebaseActive && STATE.db) {
+      STATE.db.collection('users').doc(userId).delete();
+    }
     renderUsersTable();
   }
 }
@@ -1171,6 +1229,16 @@ function exportToPDF() {
 // ==========================================================================
 
 function openFirebaseConfigModal() {
+  const savedFb = localStorage.getItem('snag_tracker_firebase_config');
+  let config = savedFb ? JSON.parse(savedFb) : DEFAULT_FIREBASE_CONFIG;
+  if (config) {
+    if (config.apiKey) document.getElementById('fbApiKey').value = config.apiKey;
+    if (config.authDomain) document.getElementById('fbAuthDomain').value = config.authDomain;
+    if (config.projectId) document.getElementById('fbProjectId').value = config.projectId;
+    if (config.storageBucket) document.getElementById('fbStorageBucket').value = config.storageBucket;
+    if (config.messagingSenderId) document.getElementById('fbMessagingSenderId').value = config.messagingSenderId;
+    if (config.appId) document.getElementById('fbAppId').value = config.appId;
+  }
   document.getElementById('firebaseModal').classList.remove('hidden');
 }
 
@@ -1198,6 +1266,7 @@ function saveFirebaseConfig(e) {
   localStorage.setItem('snag_tracker_firebase_config', JSON.stringify(config));
   initializeFirebaseApp(config);
   closeFirebaseConfigModal();
+  alert('🎉 Firebase Cloud initialized and saved permanently! Cloud sync will automatically stay connected on this device.');
 }
 
 function clearFirebaseConfig() {
@@ -1225,13 +1294,33 @@ function initializeFirebaseApp(config) {
     STATE.storage = firebase.storage();
     STATE.isFirebaseActive = true;
 
-    // Update Status Pill
     const pill = document.getElementById('firebaseStatusPill');
     const text = document.getElementById('firebaseStatusText');
-    if (pill) pill.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30';
-    if (text) text.textContent = '☁️ Live Firebase Cloud Active';
 
-    // Subscribe to Realtime Firestore updates
+    // Perform live connection test write to verify Firestore Rules & connectivity
+    STATE.db.collection('system_status').doc('ping').set({
+      connected: true,
+      lastPing: new Date().toISOString(),
+      projectId: config.projectId
+    }).then(() => {
+      console.log('✅ Firebase Cloud Firestore Write Verified!');
+      if (pill) pill.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/50';
+      if (text) text.textContent = '🟢 Firebase Cloud Verified Active';
+
+      // Seed all system users (including Admin & registered users) to Firestore
+      if (SYSTEM_USERS && SYSTEM_USERS.length > 0) {
+        SYSTEM_USERS.forEach(usr => {
+          STATE.db.collection('users').doc(usr.id).set(usr, { merge: true })
+            .catch(e => console.error('Firebase seeding error:', e));
+        });
+      }
+    }).catch(err => {
+      console.error('❌ Firebase Write Blocked:', err);
+      if (pill) pill.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/50';
+      if (text) text.textContent = '⚠️ Cloud Rules Blocked (Update Rules)';
+    });
+
+    // Subscribe to Realtime Firestore Snags updates
     STATE.db.collection('snags').onSnapshot((snapshot) => {
       const cloudSnags = [];
       snapshot.forEach(doc => {
@@ -1240,6 +1329,21 @@ function initializeFirebaseApp(config) {
       snagsStore = cloudSnags;
       saveSnagsState();
       renderApp();
+    });
+
+    // Subscribe to Realtime Firestore Users updates across all devices
+    STATE.db.collection('users').onSnapshot((snapshot) => {
+      if (!snapshot.empty) {
+        const cloudUsers = [];
+        snapshot.forEach(doc => {
+          cloudUsers.push(doc.data());
+        });
+        if (cloudUsers.length > 0) {
+          SYSTEM_USERS = cloudUsers;
+          localStorage.setItem('snag_tracker_users', JSON.stringify(SYSTEM_USERS));
+          renderUsersTable();
+        }
+      }
     });
 
   } catch (err) {
