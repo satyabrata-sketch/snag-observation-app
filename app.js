@@ -22,24 +22,28 @@ const STATE = {
   auth: null
 };
 
-// System Users Database (Default registered users)
+// System Users Database (Default registered users mapped to expanded roles)
 let SYSTEM_USERS = [
-  { id: 'usr_1', name: 'Rajesh Kumar', email: 'rajesh.elec@site.com', role: 'Technician', category: 'Electrical', created: '2026-01-15' },
-  { id: 'usr_2', name: 'Sunil Verma', email: 'sunil.plumb@site.com', role: 'Technician', category: 'Plumbing', created: '2026-01-18' },
-  { id: 'usr_3', name: 'Amit Singh', email: 'amit.carp@site.com', role: 'Technician', category: 'Carpentry', created: '2026-02-01' },
-  { id: 'usr_4', name: 'Ravi Sharma', email: 'ravi.paint@site.com', role: 'Technician', category: 'Painting', created: '2026-02-10' },
-  { id: 'usr_5', name: 'Pooja Nair', email: 'pooja.gen@site.com', role: 'Technician', category: 'General', created: '2026-03-05' },
-  { id: 'usr_6', name: 'Site Safety Admin', email: 'admin@site.com', role: 'Admin', category: 'General', created: '2026-01-01' }
+  { id: 'usr_1', name: 'Rajesh Kumar', email: 'rajesh.elec@site.com', role: 'Engineer', category: 'Electrical', created: '2026-01-15' },
+  { id: 'usr_2', name: 'Vikram Mehta', email: 'vikram.bms@site.com', role: 'BMS Operator', category: 'Electrical', created: '2026-01-16' },
+  { id: 'usr_3', name: 'Suresh Patil', email: 'suresh.mst@site.com', role: 'MST', category: 'General', created: '2026-01-17' },
+  { id: 'usr_4', name: 'Amit Singh', email: 'amit.carp@site.com', role: 'Carpenter', category: 'Carpentry', created: '2026-02-01' },
+  { id: 'usr_5', name: 'Sunil Verma', email: 'sunil.plumb@site.com', role: 'Plumber', category: 'Plumbing', created: '2026-01-18' },
+  { id: 'usr_6', name: 'Ravi Sharma', email: 'ravi.paint@site.com', role: 'Painter', category: 'Painting', created: '2026-02-10' },
+  { id: 'usr_7', name: 'Anil Kapoor', email: 'anil.super@site.com', role: 'Supervisor', category: 'General', created: '2026-02-15' },
+  { id: 'usr_8', name: 'Site Safety Admin', email: 'admin@site.com', role: 'Admin', category: 'General', created: '2026-01-01' }
 ];
 
 // Persona Mapping Configuration
 const PERSONAS = {
-  admin: { name: 'Site Safety Admin', role: 'Admin', category: 'All', icon: '👑', color: 'badge-general' },
-  user_electrical: { name: 'Rajesh Kumar', role: 'Technician', category: 'Electrical', icon: '⚡', color: 'badge-electrical' },
-  user_plumbing: { name: 'Sunil Verma', role: 'Technician', category: 'Plumbing', icon: '🔧', color: 'badge-plumbing' },
-  user_carpentry: { name: 'Amit Singh', role: 'Technician', category: 'Carpentry', icon: '🪛', color: 'badge-carpentry' },
-  user_painting: { name: 'Ravi Sharma', role: 'Technician', category: 'Painting', icon: '🎨', color: 'badge-painting' },
-  user_general: { name: 'Pooja Nair', role: 'Technician', category: 'General', icon: '📦', color: 'badge-general' }
+  user_electrical: { name: 'Rajesh Kumar', role: 'Engineer', category: 'Electrical', icon: '⚡', color: 'badge-electrical' },
+  user_bms: { name: 'Vikram Mehta', role: 'BMS Operator', category: 'Electrical', icon: '💻', color: 'badge-electrical' },
+  user_mst: { name: 'Suresh Patil', role: 'MST', category: 'General', icon: '🛠️', color: 'badge-general' },
+  user_carpentry: { name: 'Amit Singh', role: 'Carpenter', category: 'Carpentry', icon: '🪛', color: 'badge-carpentry' },
+  user_plumbing: { name: 'Sunil Verma', role: 'Plumber', category: 'Plumbing', icon: '🔧', color: 'badge-plumbing' },
+  user_painting: { name: 'Ravi Sharma', role: 'Painter', category: 'Painting', icon: '🎨', color: 'badge-painting' },
+  user_supervisor: { name: 'Anil Kapoor', role: 'Supervisor', category: 'General', icon: '📋', color: 'badge-general' },
+  admin: { name: 'Site Safety Admin', role: 'Admin', category: 'All', icon: '👑', color: 'badge-general' }
 };
 
 // Initial Snag Database (Clean empty array - zero dummy data)
@@ -162,7 +166,6 @@ function initPersonaSelector() {
       if (selectedVal === 'admin') {
         if (!STATE.isAdminAuthenticated) {
           openAdminAuthModal();
-          // Reset dropdown to previous persona until authenticated
           select.value = STATE.currentPersonaKey;
           return;
         }
@@ -710,7 +713,7 @@ function handleSaveSnag(e) {
     priority: document.getElementById('inputPriority').value,
     status: document.getElementById('inputStatus').value,
     description: document.getElementById('inputDescription').value,
-    assignedUser: `${persona.name} (${persona.category})`,
+    assignedUser: `${persona.name} (${persona.role} - ${persona.category})`,
     gps: STATE.userGps.text,
     photo: STATE.capturedPhotoDataUrl
   };
@@ -829,7 +832,7 @@ function handleCreateUser(e) {
   document.getElementById('newUserName').value = '';
   document.getElementById('newUserEmail').value = '';
   renderUsersTable();
-  alert(`User ${name} created and assigned to ${category} category!`);
+  alert(`User ${name} created with role "${role}" and assigned to ${category} category!`);
 }
 
 function renderUsersTable() {
@@ -848,7 +851,7 @@ function renderUsersTable() {
           <div class="text-[10px] text-slate-400">${usr.email}</div>
         </td>
         <td class="px-3 py-2.5">
-          <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
             ${usr.role}
           </span>
         </td>
