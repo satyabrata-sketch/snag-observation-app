@@ -88,12 +88,15 @@
         <!-- Active Logged In User Pill -->
         <div id="loggedInUserPill" class="flex items-center gap-2 bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-1.5 shadow-inner">
           <i class="fa-solid fa-user-check text-emerald-400 text-sm"></i>
-          <div class="text-left">
-            <span id="headerUserName" class="text-xs font-bold text-white block leading-tight">Personnel</span>
+          <div class="text-left cursor-pointer" onclick="openUserProfileModal()" title="Click to View Profile">
+            <span id="headerUserName" class="text-xs font-bold text-white block leading-tight hover:text-cyan-300">Personnel</span>
             <span id="headerUserRole" class="text-[10px] text-slate-400 block leading-tight">Role (Category)</span>
           </div>
-          <button onclick="handleUserLogout()" class="ml-2 px-2 py-1 rounded bg-slate-700 hover:bg-rose-900/40 text-slate-300 hover:text-rose-400 text-[10px] font-bold transition" title="Logout">
-            <i class="fa-solid fa-right-from-bracket mr-1"></i> Logout
+          <button onclick="openUserProfileModal()" class="ml-1 px-2 py-1 rounded bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 text-[10px] font-bold transition flex items-center gap-1" title="View My Profile">
+            <i class="fa-solid fa-id-card"></i> Profile
+          </button>
+          <button onclick="handleUserLogout()" class="px-2 py-1 rounded bg-slate-700 hover:bg-rose-900/40 text-slate-300 hover:text-rose-400 text-[10px] font-bold transition flex items-center gap-1" title="Logout">
+            <i class="fa-solid fa-right-from-bracket"></i> Logout
           </button>
         </div>
 
@@ -106,7 +109,7 @@
             <i class="fa-solid fa-shield-halved text-amber-400"></i> Admin Panel 🔒
           </button>
         </div>
-      </div>iv>
+      </div>
     </div>
   </header>
 
@@ -137,7 +140,10 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-3 z-10 w-full md:w-auto">
-          <button onclick="openCaptureModal()" class="w-full md:w-auto px-5 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-sm shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 transition active:scale-95">
+          <button onclick="openUserProfileModal()" class="flex-1 md:flex-initial px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition shadow">
+            <i class="fa-solid fa-address-card text-cyan-400 text-base"></i> My Profile
+          </button>
+          <button onclick="openCaptureModal()" class="flex-1 md:flex-initial px-5 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-sm shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 transition active:scale-95">
             <i class="fa-solid fa-circle-dot text-rose-400 animate-ping text-xs"></i>
             <i class="fa-solid fa-camera text-lg"></i>
             Capture & Report Snag
@@ -348,12 +354,46 @@
               </select>
             </div>
 
-            <!-- Search Keyword Input -->
-            <div>
-              <label class="block text-[11px] font-semibold text-slate-400 mb-1">Search Keywords</label>
-              <input type="text" id="adminSearchInput" oninput="renderAdminSnagsTable()" placeholder="ID, Location, Inspector..." class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500">
+          </div>
+        </div>
+
+        <!-- Location & Building Options Manager (Admin Control) -->
+        <div class="glass-panel p-4 rounded-xl space-y-3 border border-slate-800">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              <i class="fa-solid fa-building-circle-gear text-amber-400"></i> Building Location & Floor Options Manager
+            </h4>
+            <span class="text-[10px] text-cyan-400 font-mono">Changes sync live across all devices!</span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <!-- Building Locations List & Add Form -->
+            <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800 space-y-2">
+              <span class="font-bold text-slate-300 block">Building Locations</span>
+              <div id="adminBuildingsTags" class="flex flex-wrap gap-1.5 min-h-[32px] items-center">
+                <!-- Populated dynamically -->
+              </div>
+              <form onsubmit="handleAddBuildingLocation(event)" class="flex gap-2 pt-1">
+                <input type="text" id="newBuildingInput" required placeholder="New building tag (e.g. DT4, Tower C)..." class="flex-1 bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500">
+                <button type="submit" class="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs">
+                  + Add
+                </button>
+              </form>
             </div>
 
+            <!-- Floor Levels List & Add Form -->
+            <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800 space-y-2">
+              <span class="font-bold text-slate-300 block">Floor Levels</span>
+              <div id="adminFloorsTags" class="flex flex-wrap gap-1.5 min-h-[32px] items-center">
+                <!-- Populated dynamically -->
+              </div>
+              <form onsubmit="handleAddFloorLevel(event)" class="flex gap-2 pt-1">
+                <input type="text" id="newFloorInput" required placeholder="New floor tag (e.g. 6th Floor, Basement)..." class="flex-1 bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500">
+                <button type="submit" class="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs">
+                  + Add
+                </button>
+              </form>
+            </div>
           </div>
         </div>
 
@@ -658,11 +698,8 @@
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1">Building Location *</label>
             <select id="inputLocation" required class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500">
-              <option value="Tower A - Main Building">Tower A - Main Building</option>
-              <option value="Tower B - Commercial">Tower B - Commercial</option>
-              <option value="Podium Plaza">Podium Plaza</option>
-              <option value="Basement Service Utility">Basement Service Utility</option>
-              <option value="Clubhouse & Amenities">Clubhouse & Amenities</option>
+              <option value="NAB" selected>NAB</option>
+              <option value="DT3">DT3</option>
             </select>
           </div>
 
@@ -670,22 +707,20 @@
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1">Floor Level *</label>
             <select id="inputFloor" required class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500">
-              <option value="Basement 2">Basement 2</option>
-              <option value="Basement 1">Basement 1</option>
+              <option value="3rd" selected>3rd</option>
               <option value="Ground Floor">Ground Floor</option>
               <option value="1st Floor">1st Floor</option>
-              <option value="2nd Floor" selected>2nd Floor</option>
-              <option value="3rd Floor">3rd Floor</option>
+              <option value="2nd Floor">2nd Floor</option>
               <option value="4th Floor">4th Floor</option>
               <option value="5th Floor">5th Floor</option>
-              <option value="Roof Level">Roof Level</option>
+              <option value="Terrace">Terrace</option>
             </select>
           </div>
 
-          <!-- Specific Area / Room -->
+          <!-- Specific Area / Room (Free text) -->
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1">Specific Area / Room *</label>
-            <input type="text" id="inputArea" required placeholder="e.g. Electrical Panel Room 204, Corridor B" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500">
+            <input type="text" id="inputArea" required placeholder="Enter specific area / room (free text)..." class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500">
           </div>
 
           <!-- Category Selection -->
@@ -829,6 +864,58 @@
           </div>
         </div>
 
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 3: USER PROFILE VIEW MODAL                                          -->
+  <!-- ========================================================================= -->
+  <div id="userProfileModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4">
+    <div class="glass-panel bg-slate-900 border border-cyan-500/40 rounded-2xl w-full max-w-md p-6 space-y-5 shadow-2xl relative">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+          <i class="fa-solid fa-id-badge text-cyan-400"></i> User Account Profile
+        </h3>
+        <button onclick="closeUserProfileModal()" class="text-slate-400 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="text-center space-y-3">
+        <div class="w-20 h-20 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white flex items-center justify-center mx-auto text-4xl shadow-xl shadow-cyan-500/20">
+          <i class="fa-solid fa-user-check"></i>
+        </div>
+        <div>
+          <h4 id="profileName" class="text-xl font-extrabold text-white">Personnel Name</h4>
+          <span id="profileRoleBadge" class="inline-block mt-1 px-3 py-0.5 rounded-full text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">Role Tag</span>
+        </div>
+      </div>
+
+      <div class="space-y-3 bg-slate-950/60 p-4 rounded-xl border border-slate-800 text-xs font-mono">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+          <span class="text-slate-400"><i class="fa-solid fa-phone mr-1.5 text-cyan-400"></i>Mobile Number</span>
+          <span id="profileMobile" class="text-white font-bold">--</span>
+        </div>
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+          <span class="text-slate-400"><i class="fa-solid fa-envelope mr-1.5 text-cyan-400"></i>Email Address</span>
+          <span id="profileEmail" class="text-white font-bold">--</span>
+        </div>
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+          <span class="text-slate-400"><i class="fa-solid fa-layer-group mr-1.5 text-amber-400"></i>Assigned Category</span>
+          <span id="profileCategory" class="text-amber-300 font-bold">--</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-slate-400"><i class="fa-solid fa-shield-halved mr-1.5 text-emerald-400"></i>Account Status</span>
+          <span class="text-emerald-400 font-bold">🟢 Active & Authorized</span>
+        </div>
+      </div>
+
+      <div class="pt-2">
+        <button onclick="closeUserProfileModal()" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs">
+          Close Profile
+        </button>
       </div>
     </div>
   </div>
