@@ -231,17 +231,26 @@ function handleBuildingLocationChange(selectedBuilding) {
   const inputFloor = document.getElementById('inputFloor');
   if (!inputFloor) return;
 
+  const b = String(selectedBuilding || '').trim().toUpperCase();
+
   let availableFloors = [];
-  if (selectedBuilding === 'NAB-DT4') {
+  if (b === 'NAB-DT4' || b.includes('DT4')) {
     availableFloors = ['1st', '4th', '5th', '6th'];
   } else {
     // NAB-DT3 (default)
     availableFloors = ['3rd'];
   }
 
-  inputFloor.innerHTML = availableFloors.map((f, idx) => 
-    `<option value="${f}" ${idx === 0 ? 'selected' : ''}>${f}</option>`
+  const currentVal = inputFloor.value;
+  inputFloor.innerHTML = availableFloors.map((f) => 
+    `<option value="${f}">${f}</option>`
   ).join('');
+
+  if (availableFloors.includes(currentVal)) {
+    inputFloor.value = currentVal;
+  } else {
+    inputFloor.value = availableFloors[0];
+  }
 }
 
 function renderLocationOptions() {
@@ -781,6 +790,10 @@ function resetAdminFilters() {
 function openCaptureModal() {
   document.getElementById('captureModal').classList.remove('hidden');
   resetPhotoCapture();
+  const inputLoc = document.getElementById('inputLocation');
+  if (inputLoc) {
+    handleBuildingLocationChange(inputLoc.value || 'NAB-DT3');
+  }
 }
 
 function closeCaptureModal() {
