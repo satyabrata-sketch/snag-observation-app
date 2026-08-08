@@ -24,7 +24,7 @@ const STATE = {
 
 // Registered System Users Database (Clean initial database - default single Admin account)
 let SYSTEM_USERS = [
-  { id: 'usr_admin', name: 'Site Admin Manager', mobile: '9999999999', email: 'admin@site.com', password: 'Satya@1996', role: 'Admin', category: 'General', created: '2026-01-01' }
+  { id: 'usr_admin', name: 'Site Admin Manager', mobile: '7008952166', email: 'admin@site.com', password: 'Satya@1996', role: 'Admin', category: 'General', created: '2026-01-01' }
 ];
 
 // Initial Snag Database (Clean empty array - zero dummy data)
@@ -74,17 +74,26 @@ function initLocalStorage() {
       const parsed = JSON.parse(savedUsers);
       if (parsed && parsed.length > 0) {
         SYSTEM_USERS = parsed;
+        // Ensure Admin user uses mobile 7008952166 and password Satya@1996
+        SYSTEM_USERS.forEach(u => {
+          if (u.role === 'Admin' || u.id === 'usr_admin') {
+            u.mobile = '7008952166';
+            u.password = 'Satya@1996';
+          }
+        });
       }
     } catch (e) {}
-  } else {
-    localStorage.setItem('snag_tracker_users', JSON.stringify(SYSTEM_USERS));
   }
+  localStorage.setItem('snag_tracker_users', JSON.stringify(SYSTEM_USERS));
 
   const savedActiveUser = localStorage.getItem('snag_tracker_active_user');
   if (savedActiveUser) {
     try {
       STATE.currentUser = JSON.parse(savedActiveUser);
       if (STATE.currentUser && STATE.currentUser.role === 'Admin') {
+        STATE.currentUser.mobile = '7008952166';
+        STATE.currentUser.password = 'Satya@1996';
+        localStorage.setItem('snag_tracker_active_user', JSON.stringify(STATE.currentUser));
         STATE.isAdminAuthenticated = true;
       }
     } catch (e) {}
