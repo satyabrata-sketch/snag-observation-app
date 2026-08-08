@@ -32,10 +32,14 @@ const STATE = {
   auth: null
 };
 
-// Dynamic Building Location & Floor Options Store (Default: NAB, DT3 & 3rd Floor)
+// Dynamic Building Location & Floor Options Store (NAB-DT3 -> 3rd; NAB-DT4 -> 1st, 4th, 5th, 6th)
 let SITE_LOCATIONS = {
-  buildings: ['NAB', 'DT3'],
-  floors: ['3rd', 'Ground Floor', '1st Floor', '2nd Floor', '4th Floor', '5th Floor', 'Terrace']
+  buildings: ['NAB-DT3', 'NAB-DT4'],
+  floors: ['1st', '3rd', '4th', '5th', '6th'],
+  buildingFloors: {
+    'NAB-DT3': ['3rd'],
+    'NAB-DT4': ['1st', '4th', '5th', '6th']
+  }
 };
 
 // Registered System Users Database (Clean initial database - default single Admin account)
@@ -224,18 +228,41 @@ function closeUserProfileModal() {
 
 
 // Dynamic Building & Floor Location Manager Functions
+function handleBuildingLocationChange(selectedBuilding) {
+  const inputFloor = document.getElementById('inputFloor');
+  if (!inputFloor) return;
+
+  let availableFloors = [];
+  if (selectedBuilding === 'NAB-DT3' || selectedBuilding === 'NAB' || selectedBuilding === 'DT3') {
+    availableFloors = ['3rd'];
+  } else if (selectedBuilding === 'NAB-DT4') {
+    availableFloors = ['1st', '4th', '5th', '6th'];
+  } else if (SITE_LOCATIONS.buildingFloors && SITE_LOCATIONS.buildingFloors[selectedBuilding]) {
+    availableFloors = SITE_LOCATIONS.buildingFloors[selectedBuilding];
+  } else {
+    availableFloors = SITE_LOCATIONS.floors || ['1st', '3rd', '4th', '5th', '6th'];
+  }
+
+  inputFloor.innerHTML = availableFloors.map((f, idx) => 
+    `<option value="${f}" ${idx === 0 ? 'selected' : ''}>${f}</option>`
+  ).join('');
+}
+
 function renderLocationOptions() {
   const inputLoc = document.getElementById('inputLocation');
-  const inputFloor = document.getElementById('inputFloor');
   const adminFilterFloor = document.getElementById('adminFilterFloor');
   const adminBuildingsTags = document.getElementById('adminBuildingsTags');
   const adminFloorsTags = document.getElementById('adminFloorsTags');
 
   // Render Building Locations
   if (inputLoc) {
+    const curVal = inputLoc.value || 'NAB-DT3';
     inputLoc.innerHTML = SITE_LOCATIONS.buildings.map(b => 
-      `<option value="${b}">${b}</option>`
+      `<option value="${b}" ${b === curVal ? 'selected' : ''}>${b}</option>`
     ).join('');
+
+    // Trigger dynamic floor filter for currently selected building
+    handleBuildingLocationChange(inputLoc.value || 'NAB-DT3');
   }
 
   if (adminBuildingsTags) {
@@ -245,13 +272,6 @@ function renderLocationOptions() {
         <button type="button" onclick="handleDeleteBuildingLocation('${b}')" class="text-rose-400 hover:text-rose-300 ml-1 font-extrabold text-[11px]" title="Remove building tag">×</button>
       </span>
     `).join('');
-  }
-
-  // Render Floor Levels
-  if (inputFloor) {
-    inputFloor.innerHTML = SITE_LOCATIONS.floors.map(f => 
-      `<option value="${f}" ${f === '3rd' ? 'selected' : ''}>${f}</option>`
-    ).join('');
   }
 
   if (adminFilterFloor) {
