@@ -44,7 +44,7 @@ let SITE_LOCATIONS = {
 
 // Registered System Users Database (Clean initial database - default single Admin account)
 let SYSTEM_USERS = [
-  { id: 'usr_admin', name: 'Site Admin Manager', mobile: '7008952166', email: 'admin@site.com', password: 'Satya@1996', role: 'Admin', category: 'General', created: '2026-01-01' }
+  { id: 'usr_admin', name: 'Admin', mobile: '7008952166', email: 'admin@site.com', password: 'Satya@1996', role: 'Admin', category: 'General', created: '2026-01-01' }
 ];
 
 // Initial Snag Database (Clean empty array - zero dummy data)
@@ -105,9 +105,12 @@ function initLocalStorage() {
       const parsed = JSON.parse(savedUsers);
       if (parsed && parsed.length > 0) {
         SYSTEM_USERS = parsed;
-        // Ensure Admin user uses mobile 7008952166 and password Satya@1996
+        // Ensure Admin user uses name Admin, mobile 7008952166 and password Satya@1996
         SYSTEM_USERS.forEach(u => {
           if (u.role === 'Admin' || u.id === 'usr_admin') {
+            if (u.name === 'Site Admin Manager' || !u.name) {
+              u.name = 'Admin';
+            }
             u.mobile = '7008952166';
             u.password = 'Satya@1996';
           }
@@ -121,11 +124,16 @@ function initLocalStorage() {
   if (savedActiveUser) {
     try {
       STATE.currentUser = JSON.parse(savedActiveUser);
-      if (STATE.currentUser && STATE.currentUser.role === 'Admin') {
-        STATE.currentUser.mobile = '7008952166';
-        STATE.currentUser.password = 'Satya@1996';
+      if (STATE.currentUser) {
+        if (STATE.currentUser.name === 'Site Admin Manager') {
+          STATE.currentUser.name = 'Admin';
+        }
+        if (STATE.currentUser.role === 'Admin') {
+          STATE.currentUser.mobile = '7008952166';
+          STATE.currentUser.password = 'Satya@1996';
+          STATE.isAdminAuthenticated = true;
+        }
         localStorage.setItem('snag_tracker_active_user', JSON.stringify(STATE.currentUser));
-        STATE.isAdminAuthenticated = true;
       }
     } catch (e) {}
   }
@@ -212,8 +220,9 @@ function openUserProfileModal() {
   const pEmail = document.getElementById('profileEmail');
   const pCat = document.getElementById('profileCategory');
 
-  if (pName) pName.textContent = u.name;
-  if (pRole) pRole.textContent = `${u.role} Personnel`;
+  const displayName = u.name === 'Site Admin Manager' ? 'Admin' : u.name;
+  if (pName) pName.textContent = displayName;
+  if (pRole) pRole.textContent = u.role === 'Admin' ? 'Admin' : `${u.role} Personnel`;
   if (pMobile) pMobile.textContent = u.mobile;
   if (pEmail) pEmail.textContent = u.email || 'N/A';
   if (pCat) pCat.textContent = `${u.category} Category`;
@@ -511,7 +520,7 @@ function handleAdminLogin(e) {
   if (inputPwd === ADMIN_PASSWORD) {
     STATE.isAdminAuthenticated = true;
     if (!STATE.currentUser) {
-      STATE.currentUser = SYSTEM_USERS.find(u => u.role === 'Admin') || { name: 'Site Admin Manager', role: 'Admin', category: 'General' };
+      STATE.currentUser = SYSTEM_USERS.find(u => u.role === 'Admin') || { name: 'Admin', role: 'Admin', category: 'General' };
       localStorage.setItem('snag_tracker_active_user', JSON.stringify(STATE.currentUser));
     }
     document.getElementById('adminAuthModal').classList.add('hidden');
@@ -895,7 +904,7 @@ function handleFileInput(e) {
       const placeholder = document.getElementById('cameraPlaceholder');
       const retakeBtn = document.getElementById('retakeOverlay');
 
-      const maxDim = 640;
+      const maxDim = 960;
       let w = img.width || 640;
       let h = img.height || 480;
       if (w > maxDim || h > maxDim) {
@@ -914,10 +923,10 @@ function handleFileInput(e) {
 
       stampCanvasMetadata(canvas, ctx);
 
-      STATE.capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.6);
-      placeholder.classList.add('hidden');
-      canvas.classList.remove('hidden');
-      retakeBtn.classList.remove('hidden');
+      STATE.capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      if (placeholder) placeholder.classList.add('hidden');
+      if (canvas) canvas.classList.remove('hidden');
+      if (retakeBtn) retakeBtn.classList.remove('hidden');
     };
     img.src = evt.target.result;
   };
@@ -934,23 +943,28 @@ function stampCanvasMetadata(canvas, ctx) {
   const floorVal = document.getElementById('inputFloor')?.value || 'Site Area';
   const areaVal = document.getElementById('inputArea')?.value || 'General';
 
-  // Bottom overlay banner background
-  const bannerHeight = 50;
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+  // Bottom overlay banner background proportional to image height
+  const bannerHeight = Math.max(48, Math.round(canvas.height * 0.11));
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
   ctx.fillRect(0, canvas.height - bannerHeight, canvas.width, bannerHeight);
 
-  // Top accent stripe
+  // Top cyan accent stripe
   ctx.fillStyle = '#06b6d4';
   ctx.fillRect(0, canvas.height - bannerHeight, canvas.width, 3);
 
-  // Text Stamp
-  ctx.font = 'bold 16px "Courier New", monospace';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(`DATE/REALTIME: ${timestampStr}`, 15, canvas.height - 28);
+  // Proportional dynamic font sizes
+  const fontSizeMain = Math.max(13, Math.round(canvas.width / 38));
+  const fontSizeSub = Math.max(11, Math.round(canvas.width / 44));
 
-  ctx.font = '14px "Courier New", monospace';
+  // Date / Time stamp
+  ctx.font = `bold ${fontSizeMain}px "Courier New", monospace`;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(`DATE/TIME: ${timestampStr}`, 14, canvas.height - (bannerHeight * 0.52));
+
+  // Location & GPS stamp
+  ctx.font = `${fontSizeSub}px "Courier New", monospace`;
   ctx.fillStyle = '#38bdf8';
-  ctx.fillText(`LOC: ${floorVal} (${areaVal}) | GPS: ${STATE.userGps.text}`, 15, canvas.height - 10);
+  ctx.fillText(`LOC: ${floorVal} (${areaVal}) | GPS: ${STATE.userGps.text}`, 14, canvas.height - (bannerHeight * 0.18));
 }
 
 function resetPhotoCapture() {
