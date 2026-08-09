@@ -16,6 +16,8 @@ const DEFAULT_FIREBASE_CONFIG = {
 };
 
 // Global Application State
+let knownSnagIds = new Set();
+
 const STATE = {
   activeSection: 'user', // 'user' or 'admin'
   activeAdminTab: 'tracking', // 'tracking' or 'users'
@@ -29,7 +31,8 @@ const STATE = {
   isFirebaseActive: false,
   db: null,
   storage: null,
-  auth: null
+  auth: null,
+  messaging: null
 };
 
 // Dynamic Building Location & Floor Options Store (NAB-DT3 -> 3rd; NAB-DT4 -> 1st, 4th, 5th, 6th)
@@ -59,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initGeolocation();
   initDefaultMonthFilter();
   checkUserSession();
+  requestNotificationPermission();
 });
 
 // Realtime Header Clock
@@ -72,6 +76,122 @@ function initLiveClock() {
   }
   tick();
   setInterval(tick, 1000);
+}
+
+
+// ==========================================================================
+// FCM PUSH NOTIFICATION, HAPTIC VIBRATION & IN-APP TOAST MODULE
+// ==========================================================================
+
+function requestNotificationPermission() {
+  if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+    Notification.requestPermission().then(perm => {
+      console.log('Notification permission status:', perm);
+    });
+  }
+}
+
+function triggerSnagAssignmentNotification(snag) {
+  if (!snag) return;
+  const userRole = STATE.currentUser?.role;
+  const userCat = STATE.currentUser?.category;
+
+  // Check if target user is MST, Engineer, Supervisor, Admin, or assigned to this category
+  const isTargetUser = !STATE.currentUser || 
+    userRole === 'MST' || 
+    userRole === 'Engineer' || 
+    userRole === 'Admin' || 
+    userRole === 'Supervisor' || 
+    userCat === snag.category || 
+    snag.category === 'Electrical';
+
+  if (!isTargetUser) return;
+
+  const title = `⚡ New ${snag.category} Snag Assigned! (${snag.id})`;
+  const bodyText = `Location: ${snag.location} - ${snag.floor} (${snag.area})\nPriority: ${snag.priority}\nRemarks: ${snag.description}`;
+
+  // 1. Double-Pulse Haptic Vibration (Mobile Devices)
+  if ('vibrate' in navigator) {
+    try {
+      navigator.vibrate([300, 100, 300, 100, 500]);
+    } catch (e) {}
+  }
+
+  // 2. System Push Notification (Browser / FCM API)
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      const notif = new Notification(title, {
+        body: bodyText,
+        icon: 'https://cdn-icons-png.flaticon.com/512/1042/1042339.png',
+        badge: 'https://cdn-icons-png.flaticon.com/512/1042/1042339.png',
+        vibrate: [300, 100, 300, 100, 500],
+        tag: `snag-${snag.id}`,
+        requireInteraction: true
+      });
+      notif.onclick = () => {
+        window.focus();
+        openDetailModal(snag.id);
+      };
+    } catch (e) {}
+  }
+
+  // 3. Audio Beep Sound Alert
+  playNotificationSound();
+
+  // 4. In-App Floating Toast Alert
+  showInAppToastBanner(`⚡ New ${snag.category} Snag ${snag.id} Assigned to MST Team!`, `${snag.location} - ${snag.area} (${snag.priority} Priority)`, snag.id);
+}
+
+function playNotificationSound() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+  } catch (e) {}
+}
+
+function showInAppToastBanner(title, message, snagId) {
+  const container = document.getElementById('inAppToastContainer');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  toast.className = 'glass-panel bg-slate-900/95 border-2 border-cyan-500 rounded-2xl p-4 shadow-2xl pointer-events-auto transition-all duration-300 transform translate-y-0 flex items-start gap-3';
+  toast.innerHTML = `
+    <div class="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 flex items-center justify-center text-lg shrink-0 animate-bounce">
+      <i class="fa-solid fa-bell"></i>
+    </div>
+    <div class="flex-1 min-w-0">
+      <h4 class="text-xs font-bold text-white leading-tight">${title}</h4>
+      <p class="text-[11px] text-slate-300 mt-1 line-clamp-2">${message}</p>
+      <div class="mt-2 flex items-center gap-2">
+        <button onclick="openDetailModal('${snagId}'); this.closest('.glass-panel').remove();" class="px-3 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-[10px] shadow transition">
+          View Snag & Update Status
+        </button>
+        <button onclick="this.closest('.glass-panel').remove();" class="px-2 py-1 text-slate-400 hover:text-white text-[10px] font-bold">
+          Dismiss
+        </button>
+      </div>
+    </div>
+  `;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    if (toast.parentNode) {
+      toast.classList.add('opacity-0', 'translate-y-2');
+      setTimeout(() => toast.remove(), 300);
+    }
+  }, 10000);
 }
 
 // Local Storage Initializer
@@ -656,6 +776,15 @@ function renderUserSnagsFeed() {
             <div>
               <h4 class="text-xs font-bold text-white line-clamp-1">${snag.location} - ${snag.area}</h4>
               <p class="text-xs text-slate-400 line-clamp-2 mt-1 leading-relaxed">${snag.description}</p>
+              ${snag.technicianRemark ? `
+                <div class="mt-2 text-[11px] bg-slate-950/80 p-2 rounded-lg border border-cyan-500/30 text-cyan-300 font-mono">
+                  <div class="flex items-center justify-between text-[10px] font-bold text-amber-400 mb-0.5">
+                    <span>💬 MST Remark</span>
+                    <span class="text-[9px] text-slate-400 font-normal">${snag.remarkTimestamp || ''}</span>
+                  </div>
+                  <p class="text-slate-200 line-clamp-2 leading-tight">${snag.technicianRemark}</p>
+                </div>
+              ` : ''}
             </div>
           </div>
 
@@ -1016,7 +1145,11 @@ function handleSaveSnag(e) {
 
   // Add to local state & persist
   snagsStore.unshift(newSnag);
+  knownSnagIds.add(newSnag.id);
   saveSnagsState();
+
+  // Trigger Push Notification & Vibration for Electrical/MST Team
+  triggerSnagAssignmentNotification(newSnag);
 
   // Sync to Firebase if active
   if (STATE.isFirebaseActive && STATE.db) {
@@ -1032,18 +1165,46 @@ function handleSaveSnag(e) {
 
   closeCaptureModal();
   renderApp();
-  alert(`Snag Observation ${newSnag.id} created successfully and routed to ${newSnag.category} team!`);
+  alert(`🔔 Snag Observation ${newSnag.id} created successfully and routed to ${newSnag.category} MST team with push notification & vibration!`);
 }
 
 function updateSnagStatusDirect(snagId, newStatus) {
+  updateSnagStatusAndRemark(snagId, newStatus, '');
+}
+
+function updateSnagStatusAndRemark(snagId, newStatus, remarkText) {
   const target = snagsStore.find(s => s.id === snagId);
   if (target) {
     target.status = newStatus;
+    const curUserStr = STATE.currentUser ? `${STATE.currentUser.name} (${STATE.currentUser.role})` : 'MST Technician';
+    const nowStr = new Date().toLocaleString();
+
+    if (remarkText) {
+      target.technicianRemark = remarkText;
+      target.remarkTimestamp = nowStr;
+      target.updatedBy = curUserStr;
+
+      if (!target.remarksHistory) target.remarksHistory = [];
+      target.remarksHistory.unshift({
+        status: newStatus,
+        remark: remarkText,
+        timestamp: nowStr,
+        updatedBy: curUserStr
+      });
+    }
+
     saveSnagsState();
 
     if (STATE.isFirebaseActive && STATE.db) {
-      STATE.db.collection('snags').doc(snagId).update({ status: newStatus });
+      STATE.db.collection('snags').doc(snagId).update({
+        status: newStatus,
+        technicianRemark: target.technicianRemark || '',
+        remarkTimestamp: target.remarkTimestamp || '',
+        updatedBy: target.updatedBy || '',
+        remarksHistory: target.remarksHistory || []
+      });
     }
+
     renderApp();
   }
 }
@@ -1086,6 +1247,29 @@ function openDetailModal(snagId) {
   document.getElementById('detailDescription').textContent = snag.description;
   document.getElementById('detailStatusSelect').value = snag.status;
   document.getElementById('detailAssignedUser').value = snag.assignedUser;
+  
+  const remarkInput = document.getElementById('detailTechnicianRemark');
+  if (remarkInput) remarkInput.value = snag.technicianRemark || '';
+
+  const historyContainer = document.getElementById('detailRemarksHistoryContainer');
+  const historyList = document.getElementById('detailRemarksHistoryList');
+  if (historyContainer && historyList) {
+    if (snag.remarksHistory && snag.remarksHistory.length > 0) {
+      historyContainer.classList.remove('hidden');
+      historyList.innerHTML = snag.remarksHistory.map(item => `
+        <div class="border-b border-slate-800/80 pb-1.5">
+          <div class="flex items-center justify-between text-[11px] text-cyan-300 font-bold">
+            <span>Status: ${item.status}</span>
+            <span class="text-[9px] text-slate-400 font-normal">${item.timestamp}</span>
+          </div>
+          <p class="text-[11px] text-slate-200 mt-0.5">${item.remark}</p>
+          <span class="text-[9px] text-slate-500 block">By: ${item.updatedBy}</span>
+        </div>
+      `).join('');
+    } else {
+      historyContainer.classList.add('hidden');
+    }
+  }
 
   const catBadge = document.getElementById('detailCategoryBadge');
   catBadge.className = `${getCategoryBadgeClass(snag.category)} px-2.5 py-1 rounded-full text-xs font-bold`;
@@ -1101,8 +1285,11 @@ function closeDetailModal() {
 function saveDetailStatusUpdate() {
   if (!STATE.activeDetailSnagId) return;
   const newStatus = document.getElementById('detailStatusSelect').value;
-  updateSnagStatusDirect(STATE.activeDetailSnagId, newStatus);
+  const remarkText = document.getElementById('detailTechnicianRemark')?.value.trim() || '';
+
+  updateSnagStatusAndRemark(STATE.activeDetailSnagId, newStatus, remarkText);
   closeDetailModal();
+  alert(`✅ Snag ${STATE.activeDetailSnagId} status updated to "${newStatus}" with technician work remark!`);
 }
 
 
@@ -1516,8 +1703,16 @@ function initializeFirebaseApp(config) {
     // Subscribe to Realtime Firestore Snags updates
     STATE.db.collection('snags').onSnapshot((snapshot) => {
       const cloudSnags = [];
+      const isFirstLoad = knownSnagIds.size === 0;
+
       snapshot.forEach(doc => {
-        cloudSnags.push(doc.data());
+        const snag = doc.data();
+        cloudSnags.push(snag);
+
+        if (!isFirstLoad && !knownSnagIds.has(snag.id)) {
+          triggerSnagAssignmentNotification(snag);
+        }
+        knownSnagIds.add(snag.id);
       });
       snagsStore = cloudSnags;
       saveSnagsState();

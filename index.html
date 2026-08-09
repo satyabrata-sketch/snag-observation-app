@@ -45,11 +45,15 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 
   <!-- Custom CSS -->
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="antialiased text-slate-100 min-h-screen flex flex-col">
+
+  <!-- Floating Toast Banner Container for FCM Push & Live Alerts -->
+  <div id="inAppToastContainer" class="fixed top-16 right-4 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
 
   <!-- TOP NAVIGATION HEADER -->
   <header class="glass-nav sticky top-0 z-40 px-4 py-3 border-b border-slate-700/50">
@@ -801,16 +805,17 @@
           </p>
         </div>
 
-        <!-- Update Status & Assigned Technician Controls -->
-        <div class="glass-panel p-4 rounded-xl space-y-3">
-          <h4 class="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
-            <i class="fa-solid fa-pen-to-square"></i> Update Snag Status & Work Order
+        <!-- Update Status & Assigned Technician Controls (MST Work Remarks & Status) -->
+        <div class="glass-panel p-4 rounded-xl space-y-4 border border-cyan-500/30">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center justify-between">
+            <span class="flex items-center gap-1.5"><i class="fa-solid fa-pen-to-square"></i> MST Technician Action & Remark Update</span>
+            <span class="text-[10px] text-slate-400 font-mono">Updates sync live to team</span>
           </h4>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-[11px] font-semibold text-slate-300 mb-1">Status Progress</label>
-              <select id="detailStatusSelect" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2">
+              <label class="block text-[11px] font-semibold text-slate-300 mb-1">Status Progress *</label>
+              <select id="detailStatusSelect" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500 font-semibold">
                 <option value="Open">🔴 Open (Pending Action)</option>
                 <option value="In Progress">🟡 In Progress (Technician Working)</option>
                 <option value="Resolved">🟢 Resolved & Compliant</option>
@@ -819,13 +824,26 @@
 
             <div>
               <label class="block text-[11px] font-semibold text-slate-300 mb-1">Assigned Category Specialist</label>
-              <input type="text" id="detailAssignedUser" readonly class="w-full bg-slate-900/60 border border-slate-800 text-xs text-slate-400 rounded-lg px-3 py-2">
+              <input type="text" id="detailAssignedUser" readonly class="w-full bg-slate-900/60 border border-slate-800 text-xs text-slate-400 rounded-xl px-3 py-2.5 font-semibold">
             </div>
           </div>
 
-          <div class="flex justify-end pt-2">
-            <button onclick="saveDetailStatusUpdate()" class="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow transition">
-              Save Status Update
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-300 mb-1">MST Technician Work Remark / Resolution Comment *</label>
+            <textarea id="detailTechnicianRemark" rows="2" placeholder="Enter work progress details, root cause, or resolution remark (e.g. Replaced faulty MCB switch, tested load)..." class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl p-3 focus:outline-none focus:border-cyan-500 font-sans"></textarea>
+          </div>
+
+          <!-- Remarks History Timeline Log -->
+          <div id="detailRemarksHistoryContainer" class="hidden space-y-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block"><i class="fa-solid fa-clock-rotate-left mr-1 text-cyan-400"></i> Technician Remarks History Log</span>
+            <div id="detailRemarksHistoryList" class="space-y-2 text-xs font-mono max-h-36 overflow-y-auto pr-1">
+              <!-- History items populated dynamically -->
+            </div>
+          </div>
+
+          <div class="flex justify-end pt-1">
+            <button onclick="saveDetailStatusUpdate()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 flex items-center gap-2 transition active:scale-95">
+              <i class="fa-solid fa-floppy-disk"></i> Save Status & Work Remark
             </button>
           </div>
         </div>
