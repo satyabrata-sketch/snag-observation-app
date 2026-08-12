@@ -484,6 +484,7 @@
                   <option value="Carpentry">🪛 Carpentry</option>
                   <option value="Painting">🎨 Painting</option>
                   <option value="General">📦 General</option>
+                  <option value="General, Electrical">⚡📦 General & Electrical</option>
                 </select>
                 <p class="text-[10px] text-slate-400 mt-1">User will log in using Mobile/Email + Password to access this category.</p>
               </div>
@@ -854,6 +855,84 @@
 
 
   <!-- ========================================================================= -->
+  <!-- MODAL: EDIT USER DETAILS & CATEGORY MODAL                                 -->
+  <!-- ========================================================================= -->
+  <div id="editUserModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div class="glass-panel bg-slate-900 border border-amber-500/40 rounded-2xl w-[92vw] sm:w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6 space-y-4 shadow-2xl relative">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-user-pen text-amber-400"></i> Edit Personnel Details & Category
+        </h3>
+        <button type="button" onclick="closeEditUserModal()" class="text-slate-400 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="editUserForm" onsubmit="handleEditUserSubmit(event)" class="space-y-4">
+        <input type="hidden" id="editUserId">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Full Name *</label>
+          <input type="text" id="editUserName" required class="w-full bg-slate-950 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Mobile Number *</label>
+            <input type="tel" id="editUserMobile" required pattern="[0-9]{9,10}" class="w-full bg-slate-950 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 font-mono focus:outline-none focus:border-amber-500">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Email Address</label>
+            <input type="email" id="editUserEmail" placeholder="ramesh@site.com" class="w-full bg-slate-950 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Assigned Role *</label>
+            <select id="editUserRole" class="w-full bg-slate-950 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500">
+              <option value="Engineer">Engineer</option>
+              <option value="BMS Operator">BMS Operator</option>
+              <option value="MST">MST (Multi-Skilled Technician)</option>
+              <option value="Carpenter">Carpenter</option>
+              <option value="Plumber">Plumber</option>
+              <option value="Painter">Painter</option>
+              <option value="Supervisor">Supervisor</option>
+              <option value="Admin">Admin (Full Admin Rights)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Assigned Category *</label>
+            <select id="editUserCategory" class="w-full bg-slate-950 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500">
+              <option value="Electrical">⚡ Electrical</option>
+              <option value="Plumbing">🔧 Plumbing</option>
+              <option value="Carpentry">🪛 Carpentry</option>
+              <option value="Painting">🎨 Painting</option>
+              <option value="General">📦 General</option>
+              <option value="General, Electrical">⚡📦 General & Electrical</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Login Password *</label>
+          <input type="password" id="editUserPassword" required class="w-full bg-slate-950 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 font-mono focus:outline-none focus:border-amber-500">
+        </div>
+
+        <div class="flex items-center gap-3 pt-2">
+          <button type="button" onclick="closeEditUserModal()" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs">Cancel</button>
+          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg">
+            Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
   <!-- MODAL 3: USER PROFILE VIEW MODAL                                          -->
   <!-- ========================================================================= -->
   <div id="userProfileModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -896,8 +975,11 @@
         </div>
       </div>
 
-      <div class="pt-2">
-        <button onclick="closeUserProfileModal()" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition">
+      <div class="flex items-center gap-3 pt-2">
+        <button onclick="closeUserProfileModal(); openEditUserModal(STATE.currentUser?.id);" class="flex-1 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs flex items-center justify-center gap-1.5 transition">
+          <i class="fa-solid fa-pen-to-square"></i> Edit Category & Info
+        </button>
+        <button onclick="closeUserProfileModal()" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition">
           Close Profile
         </button>
       </div>

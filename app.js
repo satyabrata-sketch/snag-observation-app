@@ -48,13 +48,13 @@ let SITE_LOCATIONS = {
 // Registered System Users Database (Contact Team Details from image (10) with default password Admin@123)
 const DEFAULT_SYSTEM_USERS = [
   { id: 'usr_admin', name: 'Admin', mobile: '7008952166', email: 'admin@site.com', password: 'Satya@1996', role: 'Admin', category: 'General', created: '2026-01-01' },
-  { id: 'usr_sanjay', name: 'Sanjay', mobile: '9560184825', email: 'er.sanjaykumar5986@gmail.com', password: 'Admin@123', role: 'BMS Operator', category: 'Electrical', created: '2026-01-01' },
-  { id: 'usr_sandeep', name: 'Sandeep', mobile: '7027008682', email: 'sandeeprajput00100@gmail.com', password: 'Admin@123', role: 'BMS Operator', category: 'Electrical', created: '2026-01-01' },
-  { id: 'usr_raju', name: 'Raju Kumar', mobile: '7042436024', email: 'rajubihar20@gmail.com', password: 'Admin@123', role: 'BMS Operator', category: 'Electrical', created: '2026-01-01' },
-  { id: 'usr_vikash', name: 'Vikash', mobile: '7530816479', email: 'vikashmishra8811@gmail.com', password: 'Admin@123', role: 'MST', category: 'General', created: '2026-01-01' },
-  { id: 'usr_manmohan', name: 'Manmohan', mobile: '8383098855', email: 'manmohansing8383@gmail.com', password: 'Admin@123', role: 'MST', category: 'General', created: '2026-01-01' },
-  { id: 'usr_darshan', name: 'Darshan', mobile: '9334369687', email: 'dg8404003@gmail.com', password: 'Admin@123', role: 'MST', category: 'General', created: '2026-01-01' },
-  { id: 'usr_anuj', name: 'Anuj', mobile: '750029699', email: 'anujchaudhary4656@gmail.com', password: 'Admin@123', role: 'MST', category: 'General', created: '2026-01-01' },
+  { id: 'usr_sanjay', name: 'Sanjay', mobile: '9560184825', email: 'er.sanjaykumar5986@gmail.com', password: 'Admin@123', role: 'BMS Operator', category: 'General', created: '2026-01-01' },
+  { id: 'usr_sandeep', name: 'Sandeep', mobile: '7027008682', email: 'sandeeprajput00100@gmail.com', password: 'Admin@123', role: 'BMS Operator', category: 'General', created: '2026-01-01' },
+  { id: 'usr_raju', name: 'Raju Kumar', mobile: '7042436024', email: 'rajubihar20@gmail.com', password: 'Admin@123', role: 'BMS Operator', category: 'General', created: '2026-01-01' },
+  { id: 'usr_vikash', name: 'Vikash', mobile: '7530816479', email: 'vikashmishra8811@gmail.com', password: 'Admin@123', role: 'MST', category: 'General, Electrical', created: '2026-01-01' },
+  { id: 'usr_manmohan', name: 'Manmohan', mobile: '8383098855', email: 'manmohansing8383@gmail.com', password: 'Admin@123', role: 'MST', category: 'General, Electrical', created: '2026-01-01' },
+  { id: 'usr_darshan', name: 'Darshan', mobile: '9334369687', email: 'dg8404003@gmail.com', password: 'Admin@123', role: 'MST', category: 'General, Electrical', created: '2026-01-01' },
+  { id: 'usr_anuj', name: 'Anuj', mobile: '750029699', email: 'anujchaudhary4656@gmail.com', password: 'Admin@123', role: 'MST', category: 'General, Electrical', created: '2026-01-01' },
   { id: 'usr_sangram', name: 'Sangram', mobile: '8447265276', email: 'sangramdas595125@gmail.com', password: 'Admin@123', role: 'Plumber', category: 'Plumbing', created: '2026-01-01' },
   { id: 'usr_diwakar', name: 'Diwakar', mobile: '8587007302', email: 'dm6127886@gmail.com', password: 'Admin@123', role: 'Painter', category: 'Painting', created: '2026-01-01' }
 ];
@@ -259,6 +259,11 @@ function initLocalStorage() {
       } else {
         if (!SYSTEM_USERS[existingIndex].password) {
           SYSTEM_USERS[existingIndex].password = 'Admin@123';
+        }
+        if (SYSTEM_USERS[existingIndex].role === 'BMS Operator') {
+          SYSTEM_USERS[existingIndex].category = 'General';
+        } else if (SYSTEM_USERS[existingIndex].role === 'MST') {
+          SYSTEM_USERS[existingIndex].category = 'General, Electrical';
         }
       }
     }
@@ -720,8 +725,17 @@ function renderUserSnagsFeed() {
 
   // Filter snags by logged in user's assigned category (Unless Admin viewing)
   let filtered = snagsStore.filter(snag => {
-    if (curUser.role !== 'Admin' && snag.category !== curUser.category) {
-      return false;
+    if (curUser.role !== 'Admin') {
+      const userCats = (curUser.category || '').split(',').map(c => c.trim().toLowerCase());
+      const snagCat = (snag.category || '').trim().toLowerCase();
+      
+      let isMatch = userCats.includes(snagCat);
+      if (curUser.role === 'MST') {
+        if (snagCat === 'general' || snagCat === 'electrical') {
+          isMatch = true;
+        }
+      }
+      if (!isMatch) return false;
     }
     if (filterStatus !== 'all' && snag.status !== filterStatus) {
       return false;
@@ -1402,9 +1416,12 @@ function renderUsersTable() {
           <span class="bg-slate-900 px-2 py-0.5 rounded border border-slate-700">${usr.password}</span>
         </td>
         <td class="px-3 py-2.5 text-right">
-          <div class="flex items-center justify-end gap-2">
+          <div class="flex items-center justify-end gap-1.5">
+            <button onclick="openEditUserModal('${usr.id}')" class="px-2 py-1 rounded bg-slate-800 hover:bg-amber-600/30 text-amber-300 text-[10px] font-bold border border-amber-500/30 transition" title="Edit Category & User Details">
+              <i class="fa-solid fa-pen-to-square mr-1"></i> Edit
+            </button>
             <button onclick="impersonateUser('${usr.id}')" class="px-2 py-1 rounded bg-slate-800 hover:bg-cyan-600/30 text-cyan-300 text-[10px] font-bold border border-cyan-500/30 transition" title="Preview as this User">
-              <i class="fa-solid fa-eye mr-1"></i> View User
+              <i class="fa-solid fa-eye mr-1"></i> View
             </button>
             <button onclick="deleteUserRecord('${usr.id}')" class="p-1 rounded bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 text-xs transition" title="Delete user">
               <i class="fa-solid fa-trash"></i>
@@ -1414,6 +1431,79 @@ function renderUsersTable() {
       </tr>
     `;
   }).join('');
+}
+
+// User Edit Modal Handlers
+function openEditUserModal(userId) {
+  const usr = SYSTEM_USERS.find(u => u.id === userId);
+  if (!usr) return;
+
+  const idInput = document.getElementById('editUserId');
+  const nameInput = document.getElementById('editUserName');
+  const mobileInput = document.getElementById('editUserMobile');
+  const emailInput = document.getElementById('editUserEmail');
+  const roleInput = document.getElementById('editUserRole');
+  const catInput = document.getElementById('editUserCategory');
+  const pwdInput = document.getElementById('editUserPassword');
+
+  if (idInput) idInput.value = usr.id;
+  if (nameInput) nameInput.value = usr.name || '';
+  if (mobileInput) mobileInput.value = usr.mobile || '';
+  if (emailInput) emailInput.value = usr.email === 'N/A' ? '' : (usr.email || '');
+  if (roleInput) roleInput.value = usr.role || 'MST';
+  if (catInput) catInput.value = usr.category || 'General';
+  if (pwdInput) pwdInput.value = usr.password || 'Admin@123';
+
+  document.getElementById('editUserModal')?.classList.remove('hidden');
+}
+
+function closeEditUserModal() {
+  document.getElementById('editUserModal')?.classList.add('hidden');
+}
+
+function handleEditUserSubmit(e) {
+  e.preventDefault();
+  const userId = document.getElementById('editUserId').value;
+  const name = document.getElementById('editUserName').value.trim();
+  const mobile = document.getElementById('editUserMobile').value.trim();
+  const email = document.getElementById('editUserEmail').value.trim();
+  const role = document.getElementById('editUserRole').value;
+  const category = document.getElementById('editUserCategory').value;
+  const password = document.getElementById('editUserPassword').value.trim();
+
+  if (!/^[0-9]{9,10}$/.test(mobile)) {
+    alert('Please enter a valid 9 or 10-digit mobile number!');
+    return;
+  }
+
+  const usrIndex = SYSTEM_USERS.findIndex(u => u.id === userId);
+  if (usrIndex === -1) return;
+
+  SYSTEM_USERS[usrIndex].name = name;
+  SYSTEM_USERS[usrIndex].mobile = mobile;
+  SYSTEM_USERS[usrIndex].email = email || 'N/A';
+  SYSTEM_USERS[usrIndex].role = role;
+  SYSTEM_USERS[usrIndex].category = category;
+  SYSTEM_USERS[usrIndex].password = password || 'Admin@123';
+
+  localStorage.setItem('snag_tracker_users', JSON.stringify(SYSTEM_USERS));
+
+  // If active logged in user was updated, update STATE.currentUser
+  if (STATE.currentUser && STATE.currentUser.id === userId) {
+    STATE.currentUser = SYSTEM_USERS[usrIndex];
+    localStorage.setItem('snag_tracker_active_user', JSON.stringify(STATE.currentUser));
+  }
+
+  // Sync edited user to Cloud Firestore if active
+  if (STATE.isFirebaseActive && STATE.db) {
+    STATE.db.collection('users').doc(userId).set(SYSTEM_USERS[usrIndex], { merge: true })
+      .then(() => console.log('User updates synced to Cloud Firestore'))
+      .catch(err => console.error('Cloud Firestore user edit error:', err));
+  }
+
+  closeEditUserModal();
+  renderApp();
+  alert(`✅ User "${name}" updated successfully!\nRole: ${role} | Category: ${category}`);
 }
 
 function impersonateUser(userId) {
