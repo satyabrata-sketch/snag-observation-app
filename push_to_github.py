@@ -12,6 +12,7 @@ FILES_TO_PUSH = [
     "index.html",
     "styles.css",
     "app.js",
+    "image (10).png",
     "FIREBASE_SETUP_GUIDE.md",
     "VERCEL_GITHUB_DEPLOYMENT_GUIDE.md"
 ]

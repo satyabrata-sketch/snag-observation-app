@@ -45,10 +45,21 @@ let SITE_LOCATIONS = {
   }
 };
 
-// Registered System Users Database (Clean initial database - default single Admin account)
-let SYSTEM_USERS = [
-  { id: 'usr_admin', name: 'Admin', mobile: '7008952166', email: 'admin@site.com', password: 'Satya@1996', role: 'Admin', category: 'General', created: '2026-01-01' }
+// Registered System Users Database (Contact Team Details from image (10) with default password Admin@123)
+const DEFAULT_SYSTEM_USERS = [
+  { id: 'usr_admin', name: 'Admin', mobile: '7008952166', email: 'admin@site.com', password: 'Satya@1996', role: 'Admin', category: 'General', created: '2026-01-01' },
+  { id: 'usr_sanjay', name: 'Sanjay', mobile: '9560184825', email: 'er.sanjaykumar5986@gmail.com', password: 'Admin@123', role: 'BMS Operator', category: 'Electrical', created: '2026-01-01' },
+  { id: 'usr_sandeep', name: 'Sandeep', mobile: '7027008682', email: 'sandeeprajput00100@gmail.com', password: 'Admin@123', role: 'BMS Operator', category: 'Electrical', created: '2026-01-01' },
+  { id: 'usr_raju', name: 'Raju Kumar', mobile: '7042436024', email: 'rajubihar20@gmail.com', password: 'Admin@123', role: 'BMS Operator', category: 'Electrical', created: '2026-01-01' },
+  { id: 'usr_vikash', name: 'Vikash', mobile: '7530816479', email: 'vikashmishra8811@gmail.com', password: 'Admin@123', role: 'MST', category: 'General', created: '2026-01-01' },
+  { id: 'usr_manmohan', name: 'Manmohan', mobile: '8383098855', email: 'manmohansing8383@gmail.com', password: 'Admin@123', role: 'MST', category: 'General', created: '2026-01-01' },
+  { id: 'usr_darshan', name: 'Darshan', mobile: '9334369687', email: 'dg8404003@gmail.com', password: 'Admin@123', role: 'MST', category: 'General', created: '2026-01-01' },
+  { id: 'usr_anuj', name: 'Anuj', mobile: '750029699', email: 'anujchaudhary4656@gmail.com', password: 'Admin@123', role: 'MST', category: 'General', created: '2026-01-01' },
+  { id: 'usr_sangram', name: 'Sangram', mobile: '8447265276', email: 'sangramdas595125@gmail.com', password: 'Admin@123', role: 'Plumber', category: 'Plumbing', created: '2026-01-01' },
+  { id: 'usr_diwakar', name: 'Diwakar', mobile: '8587007302', email: 'dm6127886@gmail.com', password: 'Admin@123', role: 'Painter', category: 'Painting', created: '2026-01-01' }
 ];
+
+let SYSTEM_USERS = [...DEFAULT_SYSTEM_USERS];
 
 // Initial Snag Database (Clean empty array - zero dummy data)
 const INITIAL_SNAGS = [];
@@ -223,21 +234,36 @@ function initLocalStorage() {
   if (savedUsers) {
     try {
       const parsed = JSON.parse(savedUsers);
-      if (parsed && parsed.length > 0) {
+      if (parsed && Array.isArray(parsed) && parsed.length > 0) {
         SYSTEM_USERS = parsed;
-        // Ensure Admin user uses name Admin, mobile 7008952166 and password Satya@1996
-        SYSTEM_USERS.forEach(u => {
-          if (u.role === 'Admin' || u.id === 'usr_admin') {
-            if (u.name === 'Site Admin Manager' || !u.name) {
-              u.name = 'Admin';
-            }
-            u.mobile = '7008952166';
-            u.password = 'Satya@1996';
-          }
-        });
       }
     } catch (e) {}
   }
+
+  // Ensure all default contact team users from image (10) are merged into SYSTEM_USERS
+  DEFAULT_SYSTEM_USERS.forEach(defUser => {
+    const existingIndex = SYSTEM_USERS.findIndex(u => 
+      u.id === defUser.id || 
+      u.mobile === defUser.mobile || 
+      (u.email && u.email.toLowerCase() === defUser.email.toLowerCase())
+    );
+    if (existingIndex === -1) {
+      SYSTEM_USERS.push(defUser);
+    } else {
+      if (defUser.role === 'Admin') {
+        if (SYSTEM_USERS[existingIndex].name === 'Site Admin Manager' || !SYSTEM_USERS[existingIndex].name) {
+          SYSTEM_USERS[existingIndex].name = 'Admin';
+        }
+        SYSTEM_USERS[existingIndex].mobile = '7008952166';
+        SYSTEM_USERS[existingIndex].password = 'Satya@1996';
+      } else {
+        if (!SYSTEM_USERS[existingIndex].password) {
+          SYSTEM_USERS[existingIndex].password = 'Admin@123';
+        }
+      }
+    }
+  });
+
   localStorage.setItem('snag_tracker_users', JSON.stringify(SYSTEM_USERS));
 
   const savedActiveUser = localStorage.getItem('snag_tracker_active_user');
@@ -1306,8 +1332,8 @@ function handleCreateUser(e) {
   const role = document.getElementById('newUserRole').value;
   const category = document.getElementById('newUserCategory').value;
 
-  if (!/^[0-9]{10}$/.test(mobile)) {
-    alert('Please enter a valid 10-digit mobile number!');
+  if (!/^[0-9]{9,10}$/.test(mobile)) {
+    alert('Please enter a valid 9 or 10-digit mobile number!');
     return;
   }
 
@@ -1316,7 +1342,7 @@ function handleCreateUser(e) {
     name,
     mobile,
     email: email || 'N/A',
-    password,
+    password: password || 'Admin@123',
     role,
     category,
     created: new Date().toISOString().split('T')[0]
@@ -1341,9 +1367,9 @@ function handleCreateUser(e) {
   document.getElementById('newUserName').value = '';
   document.getElementById('newUserMobile').value = '';
   document.getElementById('newUserEmail').value = '';
-  document.getElementById('newUserPassword').value = '';
+  document.getElementById('newUserPassword').value = 'Admin@123';
   renderUsersTable();
-  alert(`User "${name}" created!\nMobile: ${mobile}\nPassword: ${password}\nRole: ${role}`);
+  alert(`User "${name}" created!\nMobile: ${mobile}\nPassword: ${password || 'Admin@123'}\nRole: ${role}`);
 }
 
 function renderUsersTable() {
