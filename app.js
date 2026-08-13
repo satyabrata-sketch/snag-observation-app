@@ -26,6 +26,8 @@ const STATE = {
   mediaStream: null,
   facingMode: 'environment', // 'user' or 'environment'
   capturedPhotoDataUrl: null,
+  stagedClosurePhoto: null,
+  removeClosurePhotoFlag: false,
   userGps: { lat: 12.9716, lng: 77.5946, text: '12.9716° N, 77.5946° E' },
   activeDetailSnagId: null,
   isFirebaseActive: false,
@@ -784,16 +786,21 @@ function renderUserSnagsFeed() {
       <div class="glass-panel rounded-2xl overflow-hidden snag-card flex flex-col justify-between border border-slate-800">
         <!-- Photo Container -->
         <div class="relative bg-black h-48 overflow-hidden group">
-          <img src="${snag.photo}" alt="${snag.id}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+          <img src="${snag.closurePhoto || snag.photo}" alt="${snag.id}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
           
           <!-- Category & Status Badge Overlay -->
-          <div class="absolute top-2 left-2 flex items-center gap-1.5">
+          <div class="absolute top-2 left-2 flex flex-wrap items-center gap-1.5">
             <span class="${catClass} px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase shadow">
               ${snag.category}
             </span>
             <span class="${statusClass} px-2.5 py-0.5 rounded-full text-[10px] font-extrabold shadow">
               ${snag.status}
             </span>
+            ${snag.closurePhoto ? `
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/90 text-white shadow border border-emerald-400/50 flex items-center gap-1">
+                <i class="fa-solid fa-circle-check"></i> Closure Photo
+              </span>
+            ` : ''}
           </div>
 
           <!-- Timestamp Watermark Overlay -->
@@ -836,8 +843,8 @@ function renderUserSnagsFeed() {
               <option value="Resolved" ${snag.status === 'Resolved' ? 'selected' : ''}>🟢 Resolved</option>
             </select>
 
-            <button onclick="openDetailModal('${snag.id}')" class="px-3 py-1 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 font-semibold text-xs border border-cyan-500/30 flex items-center gap-1 transition">
-              <i class="fa-solid fa-eye"></i> View Detail
+            <button onclick="openDetailModal('${snag.id}')" class="px-3 py-1 rounded-lg ${snag.closurePhoto ? 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border-emerald-500/30' : 'bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border-cyan-500/30'} font-semibold text-xs border flex items-center gap-1 transition">
+              <i class="fa-solid ${snag.closurePhoto ? 'fa-eye' : 'fa-camera'}"></i> ${snag.closurePhoto ? 'View Detail' : 'Closure & Detail'}
             </button>
           </div>
         </div>
@@ -908,10 +915,20 @@ function renderAdminSnagsTable() {
     return `
       <tr class="hover:bg-slate-800/40 transition">
         <td class="px-4 py-3 font-mono">
-          <div class="flex items-center gap-3">
-            <img src="${snag.photo}" class="w-10 h-10 rounded-lg object-cover border border-slate-700" alt="thumbnail">
+          <div class="flex items-center gap-2">
+            ${snag.closurePhoto ? `
+              <div class="flex items-center gap-1">
+                <img src="${snag.photo}" class="w-8 h-8 rounded-lg object-cover border border-rose-500/50" title="Initial Defect Photo">
+                <img src="${snag.closurePhoto}" class="w-8 h-8 rounded-lg object-cover border border-emerald-500/60" title="Closure Photo (Resolved)">
+              </div>
+            ` : `
+              <img src="${snag.photo}" class="w-10 h-10 rounded-lg object-cover border border-slate-700" alt="thumbnail">
+            `}
             <div>
-              <div class="font-bold text-cyan-400 text-xs">${snag.id}</div>
+              <div class="font-bold text-cyan-400 text-xs flex items-center gap-1">
+                ${snag.id}
+                ${snag.closurePhoto ? '<span class="text-[9px] text-emerald-400 font-sans" title="Closure Photo Uploaded">✓</span>' : ''}
+              </div>
               <div class="text-[10px] text-slate-400">${snag.priority} Priority</div>
             </div>
           </div>
@@ -1209,15 +1226,25 @@ function handleSaveSnag(e) {
 }
 
 function updateSnagStatusDirect(snagId, newStatus) {
-  updateSnagStatusAndRemark(snagId, newStatus, '');
+  updateSnagStatusAndRemark(snagId, newStatus, '', null, false);
 }
 
-function updateSnagStatusAndRemark(snagId, newStatus, remarkText) {
+function updateSnagStatusAndRemark(snagId, newStatus, remarkText, closurePhotoDataUrl, removeClosure) {
   const target = snagsStore.find(s => s.id === snagId);
   if (target) {
     target.status = newStatus;
     const curUserStr = STATE.currentUser ? `${STATE.currentUser.name} (${STATE.currentUser.role})` : 'MST Technician';
     const nowStr = new Date().toLocaleString();
+
+    if (closurePhotoDataUrl) {
+      target.closurePhoto = closurePhotoDataUrl;
+      target.closureTimestamp = nowStr;
+      target.closureUploadedBy = curUserStr;
+    } else if (removeClosure) {
+      delete target.closurePhoto;
+      delete target.closureTimestamp;
+      delete target.closureUploadedBy;
+    }
 
     if (remarkText) {
       target.technicianRemark = remarkText;
@@ -1229,52 +1256,184 @@ function updateSnagStatusAndRemark(snagId, newStatus, remarkText) {
         status: newStatus,
         remark: remarkText,
         timestamp: nowStr,
-        updatedBy: curUserStr
+        updatedBy: curUserStr,
+        hasClosurePhoto: !!target.closurePhoto
       });
     }
 
     saveSnagsState();
 
     if (STATE.isFirebaseActive && STATE.db) {
-      STATE.db.collection('snags').doc(snagId).update({
+      const updateData = {
         status: newStatus,
         technicianRemark: target.technicianRemark || '',
         remarkTimestamp: target.remarkTimestamp || '',
         updatedBy: target.updatedBy || '',
-        remarksHistory: target.remarksHistory || []
-      });
+        remarksHistory: target.remarksHistory || [],
+        closurePhoto: target.closurePhoto || null,
+        closureTimestamp: target.closureTimestamp || null,
+        closureUploadedBy: target.closureUploadedBy || null
+      };
+      STATE.db.collection('snags').doc(snagId).update(updateData);
     }
 
     renderApp();
   }
 }
 
-function deleteSnagRecord(snagId) {
-  if (confirm(`Are you sure you want to delete observation ${snagId}?`)) {
-    snagsStore = snagsStore.filter(s => s.id !== snagId);
-    saveSnagsState();
+// Closure Photo Upload Handlers
+function handleClosureFileInput(e) {
+  const file = e.target.files[0];
+  if (!file) return;
 
-    if (STATE.isFirebaseActive && STATE.db) {
-      STATE.db.collection('snags').doc(snagId).delete();
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      const maxDim = 800;
+      let w = img.width || 640;
+      let h = img.height || 480;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+      }
+
+      canvas.width = w;
+      canvas.height = h;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // Stamp Closure Metadata Watermark
+      const now = new Date();
+      const timestampStr = now.getFullYear() + '-' +
+        String(now.getMonth() + 1).padStart(2, '0') + '-' +
+        String(now.getDate()).padStart(2, '0') + ' ' +
+        now.toLocaleTimeString();
+
+      const bannerHeight = Math.max(42, Math.round(canvas.height * 0.12));
+      ctx.fillStyle = 'rgba(6, 78, 59, 0.92)'; // Dark Emerald banner
+      ctx.fillRect(0, canvas.height - bannerHeight, canvas.width, bannerHeight);
+
+      ctx.fillStyle = '#10b981'; // Emerald accent line
+      ctx.fillRect(0, canvas.height - bannerHeight, canvas.width, 3);
+
+      const fontSizeMain = Math.max(12, Math.round(canvas.width / 40));
+      ctx.font = `bold ${fontSizeMain}px "Courier New", monospace`;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(`CLOSURE STAMP: ${timestampStr}`, 12, canvas.height - (bannerHeight * 0.52));
+
+      const curUserStr = STATE.currentUser ? STATE.currentUser.name : 'Technician';
+      ctx.font = `${Math.max(10, fontSizeMain - 2)}px "Courier New", monospace`;
+      ctx.fillStyle = '#6ee7b7';
+      ctx.fillText(`BY: ${curUserStr} | STATUS: RESOLVED | GPS: ${STATE.userGps.text}`, 12, canvas.height - (bannerHeight * 0.18));
+
+      STATE.stagedClosurePhoto = canvas.toDataURL('image/jpeg', 0.65);
+      STATE.removeClosurePhotoFlag = false;
+
+      // Update Preview Elements in Modal
+      renderClosurePreviewState(STATE.stagedClosurePhoto, timestampStr, STATE.currentUser?.name || 'Technician');
+
+      // Auto-switch status to Resolved if currently Open or In Progress
+      const statusSel = document.getElementById('detailStatusSelect');
+      if (statusSel && statusSel.value !== 'Resolved') {
+        statusSel.value = 'Resolved';
+      }
+    };
+    img.src = evt.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderClosurePreviewState(photoUrl, timestamp, uploadedBy) {
+  const container = document.getElementById('detailClosurePhotoContainer');
+  const dateEl = document.getElementById('detailClosureDate');
+  const thumb = document.getElementById('closurePreviewThumb');
+  const title = document.getElementById('closurePhotoTitle');
+  const sub = document.getElementById('closurePhotoSub');
+  const removeBtn = document.getElementById('btnRemoveClosurePhoto');
+  const btnText = document.getElementById('closureBtnText');
+  const tag = document.getElementById('closureStatusTag');
+
+  if (photoUrl) {
+    if (container) {
+      container.className = "relative rounded-xl overflow-hidden bg-black border border-emerald-500/50 h-56 flex flex-col justify-between";
+      container.innerHTML = `
+        <img src="${photoUrl}" class="w-full h-full object-contain mx-auto" alt="Closure Photo">
+        <div class="p-2 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between text-[10px] font-mono text-emerald-400">
+          <span><i class="fa-solid fa-circle-check mr-1 text-emerald-400"></i>Resolved Evidence</span>
+          <span>By: ${uploadedBy}</span>
+        </div>
+      `;
     }
-    renderApp();
+    if (dateEl) {
+      dateEl.textContent = timestamp || 'Uploaded';
+      dateEl.className = 'text-[10px] font-mono text-emerald-400 font-bold';
+    }
+    if (thumb) {
+      thumb.innerHTML = `<img src="${photoUrl}" class="w-full h-full object-cover">`;
+    }
+    if (title) title.textContent = "🟢 Closure Photo Attached";
+    if (sub) sub.textContent = `Uploaded by ${uploadedBy} (${timestamp || 'Just now'})`;
+    if (removeBtn) removeBtn.classList.remove('hidden');
+    if (btnText) btnText.textContent = "Change Closure Photo";
+    if (tag) {
+      tag.textContent = "🟢 Closure photo ready to save";
+      tag.className = "text-[10px] font-mono text-emerald-400 font-bold";
+    }
+  } else {
+    if (container) {
+      container.className = "relative rounded-xl overflow-hidden bg-slate-950 border border-dashed border-slate-700 h-56 flex flex-col items-center justify-center text-center p-3";
+      container.innerHTML = `
+        <div class="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 text-slate-500 flex items-center justify-center text-xl mb-2">
+          <i class="fa-solid fa-camera"></i>
+        </div>
+        <p class="text-xs text-slate-400 font-medium">No closure photo uploaded yet</p>
+        <p class="text-[10px] text-slate-500 mt-1 max-w-xs">Technician can upload closure photo below when resolving this snag observation.</p>
+      `;
+    }
+    if (dateEl) {
+      dateEl.textContent = 'Not Uploaded';
+      dateEl.className = 'text-[10px] font-mono text-slate-500';
+    }
+    if (thumb) {
+      thumb.innerHTML = `<i class="fa-solid fa-image text-slate-600 text-xl"></i>`;
+    }
+    if (title) title.textContent = "No Closure Photo Attached";
+    if (sub) sub.textContent = "Upload photo showing fixed/closed snag observation";
+    if (removeBtn) removeBtn.classList.add('hidden');
+    if (btnText) btnText.textContent = "Upload Closure Photo";
+    if (tag) {
+      tag.textContent = "Upload proof of fix to resolve";
+      tag.className = "text-[10px] font-mono text-slate-400";
+    }
   }
 }
 
-function saveSnagsState() {
-  localStorage.setItem('snag_tracker_snags', JSON.stringify(snagsStore));
+function removeClosurePhoto() {
+  STATE.stagedClosurePhoto = null;
+  STATE.removeClosurePhotoFlag = true;
+  const fileInput = document.getElementById('closureFileInput');
+  if (fileInput) fileInput.value = '';
+  renderClosurePreviewState(null, '', '');
 }
-
-
-// ==========================================================================
-// DETAIL MODAL LOGIC
-// ==========================================================================
 
 function openDetailModal(snagId) {
   const snag = snagsStore.find(s => s.id === snagId);
   if (!snag) return;
 
   STATE.activeDetailSnagId = snagId;
+  STATE.stagedClosurePhoto = null;
+  STATE.removeClosurePhotoFlag = false;
+
+  const fileInput = document.getElementById('closureFileInput');
+  if (fileInput) fileInput.value = '';
 
   document.getElementById('detailSnagId').textContent = snag.id;
   document.getElementById('detailImage').src = snag.photo;
@@ -1290,6 +1449,9 @@ function openDetailModal(snagId) {
   
   const remarkInput = document.getElementById('detailTechnicianRemark');
   if (remarkInput) remarkInput.value = snag.technicianRemark || '';
+
+  // Render Closure Photo State
+  renderClosurePreviewState(snag.closurePhoto || null, snag.closureTimestamp || '', snag.closureUploadedBy || 'Technician');
 
   const historyContainer = document.getElementById('detailRemarksHistoryContainer');
   const historyList = document.getElementById('detailRemarksHistoryList');
@@ -1327,9 +1489,16 @@ function saveDetailStatusUpdate() {
   const newStatus = document.getElementById('detailStatusSelect').value;
   const remarkText = document.getElementById('detailTechnicianRemark')?.value.trim() || '';
 
-  updateSnagStatusAndRemark(STATE.activeDetailSnagId, newStatus, remarkText);
+  updateSnagStatusAndRemark(
+    STATE.activeDetailSnagId, 
+    newStatus, 
+    remarkText, 
+    STATE.stagedClosurePhoto, 
+    STATE.removeClosurePhotoFlag
+  );
+
   closeDetailModal();
-  alert(`✅ Snag ${STATE.activeDetailSnagId} status updated to "${newStatus}" with technician work remark!`);
+  alert(`✅ Snag ${STATE.activeDetailSnagId} status updated to "${newStatus}"!`);
 }
 
 
@@ -1565,13 +1734,15 @@ function exportToExcel() {
     'S.No': idx + 1,
     'Snag ID': snag.id,
     'Date & Time': snag.timestamp,
-    'Building Location': snag.location,
+    'Building': snag.location,
     'Floor Level': snag.floor,
-    'Specific Area': snag.area,
+    'Location': snag.area,
     'Category': snag.category,
     'Priority': snag.priority,
     'Status': snag.status,
     'Assigned Team / User': snag.assignedUser,
+    'Closure Photo Uploaded': snag.closurePhoto ? 'Yes' : 'No',
+    'Closure Date & Time': snag.closureTimestamp || 'N/A',
     'Observation Remarks': snag.description,
     'GPS Coordinates': snag.gps
   }));
@@ -1648,12 +1819,12 @@ function exportToPDF() {
     `${s.location}\n(${s.floor} - ${s.area})`,
     s.category,
     s.priority,
-    s.status
+    s.closurePhoto ? `${s.status}\n(Closure ✓)` : s.status
   ]);
 
   doc.autoTable({
     startY: 60,
-    head: [['#', 'Snag ID', 'Date/Time', 'Location & Area', 'Category', 'Priority', 'Status']],
+    head: [['#', 'Snag ID', 'Date/Time', 'Building & Location', 'Category', 'Priority', 'Status']],
     body: tableData,
     theme: 'grid',
     headStyles: { fillStyle: 'F', fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
@@ -1693,12 +1864,30 @@ function exportToPDF() {
     doc.text(`Captured Date & Time: ${snag.timestamp} | GPS: ${snag.gps}`, 18, 50);
     doc.text(`Assigned Specialist: ${snag.assignedUser}`, 18, 58);
 
-    try {
-      doc.addImage(snag.photo, 'JPEG', 14, 72, pageWidth - 28, 110);
-    } catch (e) {
-      doc.setFontSize(9);
+    if (snag.closurePhoto) {
+      const imgWidth = (pageWidth - 34) / 2;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
       doc.setTextColor(225, 29, 72);
-      doc.text('[Image attached as DataURL - displayed in digital view]', 14, 80);
+      doc.text('INITIAL DEFECT PHOTO (BEFORE)', 14, 70);
+      doc.setTextColor(16, 185, 129);
+      doc.text('CLOSURE PHOTO (AFTER / FIXED)', 18 + imgWidth, 70);
+
+      try {
+        doc.addImage(snag.photo, 'JPEG', 14, 73, imgWidth, 105);
+      } catch (e) {}
+
+      try {
+        doc.addImage(snag.closurePhoto, 'JPEG', 18 + imgWidth, 73, imgWidth, 105);
+      } catch (e) {}
+    } else {
+      try {
+        doc.addImage(snag.photo, 'JPEG', 14, 72, pageWidth - 28, 110);
+      } catch (e) {
+        doc.setFontSize(9);
+        doc.setTextColor(225, 29, 72);
+        doc.text('[Image attached as DataURL - displayed in digital view]', 14, 80);
+      }
     }
 
     doc.setFillColor(255, 255, 255);
