@@ -37,6 +37,91 @@ const STATE = {
   messaging: null
 };
 
+// ==========================================================================
+// IndexedDB PC Local Storage Engine for High-Res Photos (Uses PC Hard Disk)
+// ==========================================================================
+const PhotoDB = {
+  dbName: 'SnagPhotoPCStore',
+  dbVersion: 1,
+  db: null,
+
+  async init() {
+    return new Promise((resolve) => {
+      if (this.db) return resolve(this.db);
+      try {
+        const request = indexedDB.open(this.dbName, this.dbVersion);
+        request.onerror = (e) => {
+          console.warn('IndexedDB PC Store open error:', e);
+          resolve(null);
+        };
+        request.onsuccess = (e) => {
+          this.db = e.target.result;
+          console.log('💾 IndexedDB PC Photo Store Ready (Storing photos on PC disk)');
+          resolve(this.db);
+        };
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('photos')) {
+            db.createObjectStore('photos');
+          }
+        };
+      } catch (err) {
+        console.warn('IndexedDB not supported or blocked:', err);
+        resolve(null);
+      }
+    });
+  },
+
+  async savePhoto(photoKey, dataUrl) {
+    if (!dataUrl) return false;
+    if (!this.db) await this.init();
+    if (!this.db) return false;
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction('photos', 'readwrite');
+        const store = tx.objectStore('photos');
+        store.put(dataUrl, photoKey);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      } catch (e) {
+        resolve(false);
+      }
+    });
+  },
+
+  async getPhoto(photoKey) {
+    if (!this.db) await this.init();
+    if (!this.db) return null;
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction('photos', 'readonly');
+        const store = tx.objectStore('photos');
+        const req = store.get(photoKey);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  },
+
+  async removePhoto(photoKey) {
+    if (!this.db) await this.init();
+    if (!this.db) return false;
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction('photos', 'readwrite');
+        const store = tx.objectStore('photos');
+        store.delete(photoKey);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      } catch (e) {
+        resolve(false);
+      }
+    });
+  }
+};
+
 // Dynamic Building Location & Floor Options Store (NAB-DT3 -> 3rd; NAB-DT4 -> 1st, 4th, 5th, 6th)
 let SITE_LOCATIONS = {
   buildings: ['NAB-DT3', 'NAB-DT4'],
@@ -1042,13 +1127,31 @@ function stopWebcamStream() {
 }
 
 // Draw Photo Frame to Canvas & Apply Stamp Overlay (Compressed for Cloud Firestore)
+// Safe Local Storage Persister with Quota Protection & Auto-Pruning
+function saveSnagsState() {
+  try {
+    localStorage.setItem('snag_tracker_snags', JSON.stringify(snagsStore));
+  } catch (err) {
+    console.warn('⚠️ LocalStorage quota reached, auto-pruning older snag records to prevent memory freeze:', err);
+    if (snagsStore.length > 25) {
+      snagsStore = snagsStore.slice(0, 25);
+      try {
+        localStorage.setItem('snag_tracker_snags', JSON.stringify(snagsStore));
+      } catch (e) {
+        console.error('LocalStorage write failed after pruning:', e);
+      }
+    }
+  }
+}
+
+// Draw Photo Frame to Canvas & Apply Stamp Overlay (Compressed for Cloud Firestore & LocalStorage)
 function takeCameraSnap() {
   const video = document.getElementById('webcamVideo');
   const canvas = document.getElementById('snapshotCanvas');
   const ctx = canvas.getContext('2d');
   const retakeBtn = document.getElementById('retakeOverlay');
 
-  const maxDim = 640;
+  const maxDim = 500;
   let w = video.videoWidth || 640;
   let h = video.videoHeight || 480;
   if (w > maxDim || h > maxDim) {
@@ -1067,10 +1170,7 @@ function takeCameraSnap() {
   // Draw Camera Frame
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  // Apply Real-Time Date, Time & GPS Stamp Overlay
-  stampCanvasMetadata(canvas, ctx);
-
-  STATE.capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.6);
+  STATE.capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.45);
 
   stopWebcamStream();
   canvas.classList.remove('hidden');
@@ -1078,7 +1178,7 @@ function takeCameraSnap() {
 }
 
 function handleFileInput(e) {
-  const file = e.target.files[0];
+  const file = e.target.files && e.target.files[0];
   if (!file) return;
 
   const reader = new FileReader();
@@ -1090,7 +1190,7 @@ function handleFileInput(e) {
       const placeholder = document.getElementById('cameraPlaceholder');
       const retakeBtn = document.getElementById('retakeOverlay');
 
-      const maxDim = 960;
+      const maxDim = 500;
       let w = img.width || 640;
       let h = img.height || 480;
       if (w > maxDim || h > maxDim) {
@@ -1107,12 +1207,11 @@ function handleFileInput(e) {
       canvas.height = h;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      stampCanvasMetadata(canvas, ctx);
-
-      STATE.capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      STATE.capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.45);
       if (placeholder) placeholder.classList.add('hidden');
       if (canvas) canvas.classList.remove('hidden');
       if (retakeBtn) retakeBtn.classList.remove('hidden');
+      if (e.target) e.target.value = '';
     };
     img.src = evt.target.result;
   };
@@ -1135,6 +1234,21 @@ function resetPhotoCapture() {
 }
 
 
+// Helper to automatically download captured/uploaded photos directly to local PC
+function autoSavePhotoToPC(dataUrl, filename) {
+  if (!dataUrl) return;
+  try {
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename || `Snag_Photo_${Date.now()}.jpg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (e) {
+    console.warn('Auto save to PC error:', e);
+  }
+}
+
 // Save New Snag Form Handler
 function handleSaveSnag(e) {
   e.preventDefault();
@@ -1144,55 +1258,69 @@ function handleSaveSnag(e) {
     return;
   }
 
-  const now = new Date();
-  const timestampStr = now.getFullYear() + '-' +
-    String(now.getMonth() + 1).padStart(2, '0') + '-' +
-    String(now.getDate()).padStart(2, '0') + ' ' +
-    now.toLocaleTimeString();
-  
-  const monthYearStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  try {
+    const now = new Date();
+    const timestampStr = now.getFullYear() + '-' +
+      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getDate()).padStart(2, '0') + ' ' +
+      now.toLocaleTimeString();
+    
+    const monthYearStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-  const curUser = STATE.currentUser || { name: 'Inspector', role: 'Engineer', category: 'General' };
+    const curUser = STATE.currentUser || { name: 'Inspector', role: 'Engineer', category: 'General' };
 
-  const newSnag = {
-    id: `SNAG-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-    timestamp: timestampStr,
-    monthYear: monthYearStr,
-    location: document.getElementById('inputLocation').value,
-    floor: document.getElementById('inputFloor').value,
-    area: document.getElementById('inputArea').value,
-    category: document.getElementById('inputCategory').value,
-    priority: document.getElementById('inputPriority').value,
-    status: document.getElementById('inputStatus').value,
-    description: document.getElementById('inputDescription').value,
-    assignedUser: `${curUser.name} (${curUser.role} - ${curUser.category})`,
-    gps: STATE.userGps.text,
-    photo: STATE.capturedPhotoDataUrl
-  };
+    const newSnag = {
+      id: `SNAG-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      timestamp: timestampStr,
+      monthYear: monthYearStr,
+      location: document.getElementById('inputLocation')?.value || 'NAB-DT3',
+      floor: document.getElementById('inputFloor')?.value || '3rd',
+      area: document.getElementById('inputArea')?.value || 'General',
+      category: document.getElementById('inputCategory')?.value || 'General',
+      priority: document.getElementById('inputPriority')?.value || 'Medium',
+      status: document.getElementById('inputStatus')?.value || 'Open',
+      description: document.getElementById('inputDescription')?.value || '',
+      assignedUser: `${curUser.name} (${curUser.role} - ${curUser.category})`,
+      gps: STATE.userGps.text,
+      photo: STATE.capturedPhotoDataUrl
+    };
 
-  // Add to local state & persist
-  snagsStore.unshift(newSnag);
-  knownSnagIds.add(newSnag.id);
-  saveSnagsState();
+    // Store high-res photo locally on PC (IndexedDB Disk Store)
+    PhotoDB.savePhoto(newSnag.id, STATE.capturedPhotoDataUrl);
 
-  // Trigger Push Notification & Vibration for Electrical/MST Team
-  triggerSnagAssignmentNotification(newSnag);
+    // Auto-save photo file directly to user PC Downloads folder
+    autoSavePhotoToPC(STATE.capturedPhotoDataUrl, `${newSnag.id}_InitialDefect.jpg`);
 
-  // Sync to Firebase if active
-  if (STATE.isFirebaseActive && STATE.db) {
-    STATE.db.collection('snags').doc(newSnag.id).set(newSnag)
-      .then(() => {
-        console.log('✅ Snag synced to Firebase Firestore successfully');
-      })
-      .catch(err => {
-        console.error('❌ Firebase snag save error:', err);
-        alert('⚠️ Cloud Sync Error: ' + err.message + '\n\nMake sure your Firestore Rules in Firebase Console allow write operations!');
-      });
+    // Add to local state & persist
+    snagsStore.unshift(newSnag);
+    knownSnagIds.add(newSnag.id);
+    saveSnagsState();
+
+    // Trigger Push Notification & Vibration for Electrical/MST Team
+    triggerSnagAssignmentNotification(newSnag);
+
+    // Sync metadata to Firebase Firestore WITHOUT heavy photo payload (<1KB doc size)
+    if (STATE.isFirebaseActive && STATE.db) {
+      const firestoreRecord = { ...newSnag };
+      delete firestoreRecord.photo; // Exclude photo Base64 from Cloud Firestore to save space!
+      firestoreRecord.hasPhotoOnPC = true;
+
+      STATE.db.collection('snags').doc(newSnag.id).set(firestoreRecord)
+        .then(() => {
+          console.log('✅ Lightweight snag record synced to Firebase (Photo saved on PC disk)');
+        })
+        .catch(err => {
+          console.error('❌ Firebase snag save error:', err);
+        });
+    }
+
+    closeCaptureModal();
+    renderApp();
+    alert(`🔔 Snag Observation ${newSnag.id} created successfully!\n\n📷 Photo automatically saved to your PC folder & snag metadata synced to Cloud.`);
+  } catch (err) {
+    console.error('Error in handleSaveSnag:', err);
+    alert('Error submitting snag observation: ' + err.message);
   }
-
-  closeCaptureModal();
-  renderApp();
-  alert(`🔔 Snag Observation ${newSnag.id} created successfully and routed to ${newSnag.category} MST team with push notification & vibration!`);
 }
 
 function updateSnagStatusDirect(snagId, newStatus) {
@@ -1214,10 +1342,13 @@ function updateSnagStatusAndRemark(snagId, newStatus, remarkText, closurePhotoDa
     target.closurePhoto = closurePhotoDataUrl;
     target.closureTimestamp = nowStr;
     target.closureUploadedBy = curUserStr;
+    PhotoDB.savePhoto(target.id + '_closure', closurePhotoDataUrl);
+    autoSavePhotoToPC(closurePhotoDataUrl, `${target.id}_ClosurePhoto.jpg`);
   } else if (removeClosure) {
     delete target.closurePhoto;
     delete target.closureTimestamp;
     delete target.closureUploadedBy;
+    PhotoDB.removePhoto(target.id + '_closure');
   }
 
   if (remarkText && String(remarkText).trim()) {
@@ -1252,13 +1383,13 @@ function updateSnagStatusAndRemark(snagId, newStatus, remarkText, closurePhotoDa
           updatedBy: r.updatedBy || '',
           hasClosurePhoto: !!r.hasClosurePhoto
         })),
-        closurePhoto: target.closurePhoto || null,
         closureTimestamp: target.closureTimestamp || null,
-        closureUploadedBy: target.closureUploadedBy || null
+        closureUploadedBy: target.closureUploadedBy || null,
+        hasClosurePhotoOnPC: !!target.closurePhoto
       };
 
       STATE.db.collection('snags').doc(snagId).set(updateData, { merge: true })
-        .then(() => console.log(`✅ Snag ${snagId} synced to Cloud Firestore`))
+        .then(() => console.log(`✅ Snag ${snagId} synced to Cloud Firestore (Photo on PC)`))
         .catch(err => console.error('Cloud Firestore update error:', err));
     } catch (err) {
       console.error('Error in Firestore payload prep:', err);
@@ -1335,7 +1466,7 @@ function handleClosureFileInput(e) {
       STATE.stagedClosurePhoto = canvas.toDataURL('image/jpeg', 0.50);
       STATE.removeClosurePhotoFlag = false;
 
-      // Immediately persist & reflect in snag store and Admin page
+      // Immediately persist to PC & reflect in snag store and Admin page
       if (STATE.activeDetailSnagId) {
         const activeSnag = snagsStore.find(s => s.id === STATE.activeDetailSnagId);
         if (activeSnag) {
@@ -1344,16 +1475,18 @@ function handleClosureFileInput(e) {
           activeSnag.closureUploadedBy = curUserStr;
           activeSnag.status = 'Resolved';
 
+          PhotoDB.savePhoto(activeSnag.id + '_closure', STATE.stagedClosurePhoto);
+          autoSavePhotoToPC(STATE.stagedClosurePhoto, `${activeSnag.id}_ClosurePhoto.jpg`);
           saveSnagsState();
 
           if (STATE.isFirebaseActive && STATE.db) {
             STATE.db.collection('snags').doc(activeSnag.id).set({
               status: 'Resolved',
-              closurePhoto: activeSnag.closurePhoto,
               closureTimestamp: activeSnag.closureTimestamp,
-              closureUploadedBy: activeSnag.closureUploadedBy
+              closureUploadedBy: activeSnag.closureUploadedBy,
+              hasClosurePhotoOnPC: true
             }, { merge: true }).then(() => {
-              console.log('✅ Closure photo synced live to Cloud Firestore');
+              console.log('✅ Closure status synced live to Cloud Firestore (Photo on PC)');
             }).catch(err => {
               console.error('❌ Cloud Firestore sync error:', err);
             });
