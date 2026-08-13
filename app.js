@@ -1377,14 +1377,21 @@ function updateSnagStatusAndRemark(snagId, newStatus, remarkText, closurePhotoDa
           timestamp: r.timestamp || '',
           updatedBy: r.updatedBy || '',
           hasClosurePhoto: !!r.hasClosurePhoto
-        })),
-        closurePhoto: target.closurePhoto || null,
-        closureTimestamp: target.closureTimestamp || null,
-        closureUploadedBy: target.closureUploadedBy || null
+        }))
       };
 
+      if (target.closurePhoto) {
+        updateData.closurePhoto = target.closurePhoto;
+        updateData.closureTimestamp = target.closureTimestamp || nowStr;
+        updateData.closureUploadedBy = target.closureUploadedBy || curUserStr;
+      } else if (removeClosure) {
+        updateData.closurePhoto = null;
+        updateData.closureTimestamp = null;
+        updateData.closureUploadedBy = null;
+      }
+
       STATE.db.collection('snags').doc(snagId).set(updateData, { merge: true })
-        .then(() => console.log(`✅ Snag ${snagId} synced to Cloud Firestore`))
+        .then(() => console.log(`✅ Snag ${snagId} synced to Cloud Firestore with closure photo`))
         .catch(err => console.error('Cloud Firestore update error:', err));
     } catch (err) {
       console.error('Error in Firestore payload prep:', err);
