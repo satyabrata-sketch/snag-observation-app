@@ -807,31 +807,50 @@ function renderUserSnagsFeed() {
   if (!grid || !STATE.currentUser) return;
 
   const curUser = STATE.currentUser;
+  const filterScope = document.getElementById('userFilterScope')?.value || 'all';
   const filterStatus = document.getElementById('userFilterStatus')?.value || 'all';
   const searchQuery = document.getElementById('userSearchInput')?.value?.toLowerCase() || '';
 
-  // Filter snags by logged in user's assigned category (Unless Admin viewing)
+  const userNameLower = (curUser.name || '').trim().toLowerCase();
+  const userCats = (curUser.category || '').split(',').map(c => c.trim().toLowerCase());
+
   let filtered = snagsStore.filter(snag => {
-    if (curUser.role !== 'Admin') {
-      const userCats = (curUser.category || '').split(',').map(c => c.trim().toLowerCase());
-      const snagCat = (snag.category || '').trim().toLowerCase();
-      
-      let isMatch = userCats.includes(snagCat);
-      if (curUser.role === 'MST') {
-        if (snagCat === 'general' || snagCat === 'electrical') {
-          isMatch = true;
-        }
+    const createdByLower = (snag.createdBy || '').trim().toLowerCase();
+    const assignedUserLower = (snag.assignedUser || '').trim().toLowerCase();
+    const snagCatLower = (snag.category || '').trim().toLowerCase();
+
+    // Check if raised by logged-in user
+    const isRaisedByMe = createdByLower === userNameLower || assignedUserLower.includes(userNameLower);
+
+    // Check if assigned to logged-in user's team / category
+    let isAssignedToMyTeam = userCats.includes(snagCatLower);
+    if (curUser.role === 'MST') {
+      if (snagCatLower === 'general' || snagCatLower === 'electrical') {
+        isAssignedToMyTeam = true;
       }
-      if (!isMatch) return false;
     }
-    if (filterStatus !== 'all' && snag.status !== filterStatus) {
-      return false;
+    if (curUser.role === 'Admin') {
+      isAssignedToMyTeam = true;
     }
+
+    // Filter Scope Selection
+    if (filterScope === 'raised' && !isRaisedByMe) return false;
+    if (filterScope === 'assigned' && !isAssignedToMyTeam) return false;
+    if (filterScope === 'all' && curUser.role !== 'Admin') {
+      if (!isRaisedByMe && !isAssignedToMyTeam) return false;
+    }
+
+    // Filter Status Selection
+    if (filterStatus !== 'all' && snag.status !== filterStatus) return false;
+
+    // Search Query
     if (searchQuery) {
       const match = snag.location.toLowerCase().includes(searchQuery) ||
                     snag.area.toLowerCase().includes(searchQuery) ||
                     snag.description.toLowerCase().includes(searchQuery) ||
-                    snag.id.toLowerCase().includes(searchQuery);
+                    snag.id.toLowerCase().includes(searchQuery) ||
+                    (snag.createdBy && snag.createdBy.toLowerCase().includes(searchQuery)) ||
+                    (snag.assignedUser && snag.assignedUser.toLowerCase().includes(searchQuery));
       if (!match) return false;
     }
     return true;
@@ -856,7 +875,7 @@ function renderUserSnagsFeed() {
           <i class="fa-solid fa-folder-open"></i>
         </div>
         <h4 class="text-sm font-bold text-slate-300">No Snag Observations Found</h4>
-        <p class="text-xs text-slate-500">No defect observations logged in category (${curUser.category}). Click "Capture & Report Snag" to add one!</p>
+        <p class="text-xs text-slate-500">No snag observations match your selected filter (${filterScope === 'raised' ? 'Raised by Me' : filterScope === 'assigned' ? 'Assigned to My Team' : 'All My Snags'}).</p>
       </div>
     `;
     return;
@@ -866,12 +885,13 @@ function renderUserSnagsFeed() {
   grid.innerHTML = filtered.map(snag => {
     const catClass = getCategoryBadgeClass(snag.category);
     const statusClass = getStatusBadgeClass(snag.status);
+    const creatorName = snag.createdBy || 'Inspector';
 
     return `
       <div class="glass-panel rounded-2xl overflow-hidden snag-card flex flex-col justify-between border border-slate-800">
         <!-- Photo Container -->
         <div class="relative bg-black h-48 overflow-hidden group">
-          <img src="${snag.closurePhoto || snag.photo}" alt="${snag.id}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+          <img src="${snag.closurePhoto || snag.photo}" alt="${snag.id}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" onclick="downloadAndZoomPhoto('${snag.closurePhoto || snag.photo}', '${snag.id}_Photo.jpg', '${snag.closurePhoto ? 'Closure Evidence Photo' : 'Initial Defect Photo'}')" title="Click to Download & View Clear High-Res Photo">
           
           <!-- Category & Status Badge Overlay -->
           <div class="absolute top-2 left-2 flex flex-wrap items-center gap-1.5">
@@ -908,6 +928,14 @@ function renderUserSnagsFeed() {
             <div>
               <h4 class="text-xs font-bold text-white line-clamp-1">${snag.location} - ${snag.area}</h4>
               <p class="text-xs text-slate-400 line-clamp-2 mt-1 leading-relaxed">${snag.description}</p>
+
+              <div class="mt-2.5 pt-2 border-t border-slate-800/80 space-y-1 text-[10px] font-mono text-slate-400">
+                <div class="flex items-center justify-between">
+                  <span><i class="fa-solid fa-user-pen text-cyan-400 mr-1"></i>Raised By: <strong class="text-slate-200">${creatorName}</strong></span>
+                  <span><i class="fa-solid fa-user-gear text-teal-400 mr-1"></i>Team: <strong class="text-slate-200">${snag.category}</strong></span>
+                </div>
+              </div>
+
               ${snag.technicianRemark ? `
                 <div class="mt-2 text-[11px] bg-slate-950/80 p-2 rounded-lg border border-cyan-500/30 text-cyan-300 font-mono">
                   <div class="flex items-center justify-between text-[10px] font-bold text-amber-400 mb-0.5">
@@ -1279,6 +1307,9 @@ function handleSaveSnag(e) {
       priority: document.getElementById('inputPriority')?.value || 'Medium',
       status: document.getElementById('inputStatus')?.value || 'Open',
       description: document.getElementById('inputDescription')?.value || '',
+      createdBy: curUser.name,
+      createdByRole: curUser.role,
+      createdByCategory: curUser.category,
       assignedUser: `${curUser.name} (${curUser.role} - ${curUser.category})`,
       gps: STATE.userGps.text,
       photo: STATE.capturedPhotoDataUrl
