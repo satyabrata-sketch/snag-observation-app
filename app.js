@@ -1318,6 +1318,38 @@ function handleSaveSnag(e) {
   }
 }
 
+function deleteSnagRecord(snagId) {
+  if (!snagId) return;
+
+  const target = snagsStore.find(s => s.id === snagId);
+  const snagName = target ? target.id : snagId;
+
+  if (!confirm(`⚠️ Delete Snag Observation "${snagName}"?\n\nThis will permanently remove this observation record from local storage and Cloud Firestore.`)) {
+    return;
+  }
+
+  // Remove from local memory array
+  snagsStore = snagsStore.filter(s => s.id !== snagId);
+  knownSnagIds.delete(snagId);
+
+  // Save updated state
+  saveSnagsState();
+
+  // Delete photos from IndexedDB PC Store
+  PhotoDB.removePhoto(snagId);
+  PhotoDB.removePhoto(snagId + '_closure');
+
+  // Delete from Cloud Firestore if active
+  if (STATE.isFirebaseActive && STATE.db) {
+    STATE.db.collection('snags').doc(snagId).delete()
+      .then(() => console.log(`✅ Snag ${snagId} deleted from Cloud Firestore`))
+      .catch(err => console.error('❌ Firestore delete error:', err));
+  }
+
+  renderApp();
+  alert(`🗑️ Snag Observation "${snagName}" deleted successfully.`);
+}
+
 function updateSnagStatusDirect(snagId, newStatus) {
   updateSnagStatusAndRemark(snagId, newStatus, '', null, false);
 }
@@ -1338,7 +1370,6 @@ function updateSnagStatusAndRemark(snagId, newStatus, remarkText, closurePhotoDa
     target.closureTimestamp = nowStr;
     target.closureUploadedBy = curUserStr;
     PhotoDB.savePhoto(target.id + '_closure', closurePhotoDataUrl);
-    autoSavePhotoToPC(closurePhotoDataUrl, `${target.id}_ClosurePhoto.jpg`);
   } else if (removeClosure) {
     delete target.closurePhoto;
     delete target.closureTimestamp;
@@ -1497,7 +1528,6 @@ function handleClosureFileInput(e) {
           activeSnag.status = 'Resolved';
 
           PhotoDB.savePhoto(activeSnag.id + '_closure', STATE.stagedClosurePhoto);
-          autoSavePhotoToPC(STATE.stagedClosurePhoto, `${activeSnag.id}_ClosurePhoto.jpg`);
           saveSnagsState();
 
           if (STATE.isFirebaseActive && STATE.db) {
@@ -1545,12 +1575,12 @@ function renderClosurePreviewState(photoUrl, timestamp, uploadedBy) {
 
   if (photoUrl) {
     if (container) {
-      container.className = "relative rounded-xl overflow-hidden bg-black border border-emerald-500/50 h-56 flex flex-col justify-between group cursor-pointer";
-      container.onclick = () => downloadAndZoomPhoto(photoUrl, `${STATE.activeDetailSnagId || 'Closure'}_ClosurePhoto.jpg`, 'Closure Photo (Resolved Evidence)');
+      container.className = "relative rounded-xl overflow-hidden bg-black border border-emerald-500/50 h-56 flex flex-col justify-between group";
+      container.onclick = null;
       container.innerHTML = `
-        <img src="${photoUrl}" class="w-full h-full object-contain mx-auto transition-transform duration-300 group-hover:scale-105" alt="Closure Photo" title="Click to Download & View Clear Photo">
+        <img src="${photoUrl}" class="w-full h-full object-contain mx-auto transition-transform duration-300 group-hover:scale-105 cursor-pointer" onclick="openPhotoLightbox('${photoUrl}', 'Closure Photo Evidence')" alt="Closure Photo" title="Click to View Full Photo">
         <div class="p-2 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between text-[10px] font-mono text-emerald-400">
-          <span><i class="fa-solid fa-circle-check mr-1 text-emerald-400"></i>Resolved Evidence (Click to Download & View Clear Photo)</span>
+          <span><i class="fa-solid fa-circle-check mr-1 text-emerald-400"></i>Resolved Evidence</span>
           <span>By: ${uploadedBy}</span>
         </div>
       `;
