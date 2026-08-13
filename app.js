@@ -914,48 +914,48 @@ function renderAdminSnagsTable() {
 
     return `
       <tr class="hover:bg-slate-800/40 transition">
-        <td class="px-4 py-3 font-mono">
-          <div class="flex items-center gap-2">
-            ${snag.closurePhoto ? `
-              <div class="flex items-center gap-1">
-                <img src="${snag.photo}" class="w-8 h-8 rounded-lg object-cover border border-rose-500/50" title="Initial Defect Photo">
-                <img src="${snag.closurePhoto}" class="w-8 h-8 rounded-lg object-cover border border-emerald-500/60" title="Closure Photo (Resolved)">
-              </div>
-            ` : `
-              <img src="${snag.photo}" class="w-10 h-10 rounded-lg object-cover border border-slate-700" alt="thumbnail">
-            `}
+        <td class="px-3 py-3 font-mono">
+          <div class="flex items-center gap-2.5">
+            <img src="${snag.photo}" class="w-10 h-10 rounded-lg object-cover border border-slate-700 cursor-pointer" onclick="openDetailModal('${snag.id}')" alt="Initial Defect Photo" title="Click to View Detail">
             <div>
-              <div class="font-bold text-cyan-400 text-xs flex items-center gap-1">
-                ${snag.id}
-                ${snag.closurePhoto ? '<span class="text-[9px] text-emerald-400 font-sans" title="Closure Photo Uploaded">✓</span>' : ''}
-              </div>
+              <div class="font-bold text-cyan-400 text-xs">${snag.id}</div>
               <div class="text-[10px] text-slate-400">${snag.priority} Priority</div>
             </div>
           </div>
         </td>
-        <td class="px-4 py-3 font-mono text-[11px] text-slate-300">
+        <td class="px-3 py-3 font-mono">
+          ${snag.closurePhoto ? `
+            <div class="flex items-center gap-2 cursor-pointer" onclick="openDetailModal('${snag.id}')" title="Click to View Detail">
+              <img src="${snag.closurePhoto}" class="w-10 h-10 rounded-lg object-cover border-2 border-emerald-500/70 shadow" alt="Closure Photo">
+              <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30">✓ Uploaded</span>
+            </div>
+          ` : `
+            <span class="text-[11px] text-slate-500 font-mono italic flex items-center gap-1"><i class="fa-solid fa-clock text-[10px]"></i> Pending</span>
+          `}
+        </td>
+        <td class="px-3 py-3 font-mono text-[11px] text-slate-300">
           <i class="fa-solid fa-clock mr-1 text-slate-500"></i>${snag.timestamp}
         </td>
-        <td class="px-4 py-3">
+        <td class="px-3 py-3">
           <div class="font-semibold text-white text-xs">${snag.location}</div>
           <div class="text-[10px] text-slate-400">${snag.floor} • ${snag.area}</div>
         </td>
-        <td class="px-4 py-3">
+        <td class="px-3 py-3">
           <span class="${catClass} px-2.5 py-0.5 rounded-full text-[10px] font-bold">
             ${snag.category}
           </span>
         </td>
-        <td class="px-4 py-3 text-xs text-slate-300">
+        <td class="px-3 py-3 text-xs text-slate-300">
           ${snag.assignedUser}
         </td>
-        <td class="px-4 py-3">
+        <td class="px-3 py-3">
           <span class="${statusClass} px-2 py-0.5 rounded-full text-[10px] font-bold">
             ${snag.status}
           </span>
         </td>
-        <td class="px-4 py-3 text-right">
+        <td class="px-3 py-3 text-right">
           <div class="flex items-center justify-end gap-2">
-            <button onclick="openDetailModal('${snag.id}')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="View Full Details">
+            <button onclick="openDetailModal('${snag.id}')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="View Full Details & Photos">
               <i class="fa-solid fa-pen-to-square"></i>
             </button>
             <button onclick="deleteSnagRecord('${snag.id}')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 transition" title="Delete Snag">
@@ -1120,37 +1120,7 @@ function handleFileInput(e) {
 }
 
 function stampCanvasMetadata(canvas, ctx) {
-  const now = new Date();
-  const timestampStr = now.getFullYear() + '-' +
-    String(now.getMonth() + 1).padStart(2, '0') + '-' +
-    String(now.getDate()).padStart(2, '0') + ' ' +
-    now.toLocaleTimeString();
-
-  const floorVal = document.getElementById('inputFloor')?.value || 'Site Area';
-  const areaVal = document.getElementById('inputArea')?.value || 'General';
-
-  // Bottom overlay banner background proportional to image height
-  const bannerHeight = Math.max(48, Math.round(canvas.height * 0.11));
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
-  ctx.fillRect(0, canvas.height - bannerHeight, canvas.width, bannerHeight);
-
-  // Top cyan accent stripe
-  ctx.fillStyle = '#06b6d4';
-  ctx.fillRect(0, canvas.height - bannerHeight, canvas.width, 3);
-
-  // Proportional dynamic font sizes
-  const fontSizeMain = Math.max(13, Math.round(canvas.width / 38));
-  const fontSizeSub = Math.max(11, Math.round(canvas.width / 44));
-
-  // Date / Time stamp
-  ctx.font = `bold ${fontSizeMain}px "Courier New", monospace`;
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(`DATE/TIME: ${timestampStr}`, 14, canvas.height - (bannerHeight * 0.52));
-
-  // Location & GPS stamp
-  ctx.font = `${fontSizeSub}px "Courier New", monospace`;
-  ctx.fillStyle = '#38bdf8';
-  ctx.fillText(`LOC: ${floorVal} (${areaVal}) | GPS: ${STATE.userGps.text}`, 14, canvas.height - (bannerHeight * 0.18));
+  // Clean photo capture without timestamp text watermark on image
 }
 
 function resetPhotoCapture() {
@@ -1231,54 +1201,71 @@ function updateSnagStatusDirect(snagId, newStatus) {
 
 function updateSnagStatusAndRemark(snagId, newStatus, remarkText, closurePhotoDataUrl, removeClosure) {
   const target = snagsStore.find(s => s.id === snagId);
-  if (target) {
-    target.status = newStatus;
-    const curUserStr = STATE.currentUser ? `${STATE.currentUser.name} (${STATE.currentUser.role})` : 'MST Technician';
-    const nowStr = new Date().toLocaleString();
+  if (!target) {
+    console.error('Target snag not found:', snagId);
+    return;
+  }
 
-    if (closurePhotoDataUrl) {
-      target.closurePhoto = closurePhotoDataUrl;
-      target.closureTimestamp = nowStr;
-      target.closureUploadedBy = curUserStr;
-    } else if (removeClosure) {
-      delete target.closurePhoto;
-      delete target.closureTimestamp;
-      delete target.closureUploadedBy;
-    }
+  target.status = newStatus || target.status || 'Open';
+  const curUserStr = STATE.currentUser ? `${STATE.currentUser.name} (${STATE.currentUser.role})` : 'MST Technician';
+  const nowStr = new Date().toLocaleString();
 
-    if (remarkText) {
-      target.technicianRemark = remarkText;
-      target.remarkTimestamp = nowStr;
-      target.updatedBy = curUserStr;
+  if (closurePhotoDataUrl) {
+    target.closurePhoto = closurePhotoDataUrl;
+    target.closureTimestamp = nowStr;
+    target.closureUploadedBy = curUserStr;
+  } else if (removeClosure) {
+    delete target.closurePhoto;
+    delete target.closureTimestamp;
+    delete target.closureUploadedBy;
+  }
 
-      if (!target.remarksHistory) target.remarksHistory = [];
-      target.remarksHistory.unshift({
-        status: newStatus,
-        remark: remarkText,
-        timestamp: nowStr,
-        updatedBy: curUserStr,
-        hasClosurePhoto: !!target.closurePhoto
-      });
-    }
+  if (remarkText && String(remarkText).trim()) {
+    const cleanRemark = String(remarkText).trim();
+    target.technicianRemark = cleanRemark;
+    target.remarkTimestamp = nowStr;
+    target.updatedBy = curUserStr;
 
-    saveSnagsState();
+    if (!target.remarksHistory) target.remarksHistory = [];
+    target.remarksHistory.unshift({
+      status: target.status,
+      remark: cleanRemark,
+      timestamp: nowStr,
+      updatedBy: curUserStr,
+      hasClosurePhoto: !!target.closurePhoto
+    });
+  }
 
-    if (STATE.isFirebaseActive && STATE.db) {
+  saveSnagsState();
+
+  if (STATE.isFirebaseActive && STATE.db) {
+    try {
       const updateData = {
-        status: newStatus,
+        status: target.status || 'Open',
         technicianRemark: target.technicianRemark || '',
         remarkTimestamp: target.remarkTimestamp || '',
         updatedBy: target.updatedBy || '',
-        remarksHistory: target.remarksHistory || [],
+        remarksHistory: (target.remarksHistory || []).map(r => ({
+          status: r.status || '',
+          remark: r.remark || '',
+          timestamp: r.timestamp || '',
+          updatedBy: r.updatedBy || '',
+          hasClosurePhoto: !!r.hasClosurePhoto
+        })),
         closurePhoto: target.closurePhoto || null,
         closureTimestamp: target.closureTimestamp || null,
         closureUploadedBy: target.closureUploadedBy || null
       };
-      STATE.db.collection('snags').doc(snagId).update(updateData);
-    }
 
-    renderApp();
+      STATE.db.collection('snags').doc(snagId).set(updateData, { merge: true })
+        .then(() => console.log(`✅ Snag ${snagId} synced to Cloud Firestore`))
+        .catch(err => console.error('Cloud Firestore update error:', err));
+    } catch (err) {
+      console.error('Error in Firestore payload prep:', err);
+    }
   }
+
+  renderApp();
 }
 
 // Closure Photo Upload Handlers
@@ -1293,7 +1280,7 @@ function handleClosureFileInput(e) {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
 
-      const maxDim = 800;
+      const maxDim = 550;
       let w = img.width || 640;
       let h = img.height || 480;
       if (w > maxDim || h > maxDim) {
@@ -1310,32 +1297,44 @@ function handleClosureFileInput(e) {
       canvas.height = h;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      // Stamp Closure Metadata Watermark
       const now = new Date();
       const timestampStr = now.getFullYear() + '-' +
         String(now.getMonth() + 1).padStart(2, '0') + '-' +
         String(now.getDate()).padStart(2, '0') + ' ' +
         now.toLocaleTimeString();
 
-      const bannerHeight = Math.max(42, Math.round(canvas.height * 0.12));
-      ctx.fillStyle = 'rgba(6, 78, 59, 0.92)'; // Dark Emerald banner
-      ctx.fillRect(0, canvas.height - bannerHeight, canvas.width, bannerHeight);
+      const curUserStr = STATE.currentUser ? `${STATE.currentUser.name} (${STATE.currentUser.role})` : 'MST Technician';
 
-      ctx.fillStyle = '#10b981'; // Emerald accent line
-      ctx.fillRect(0, canvas.height - bannerHeight, canvas.width, 3);
-
-      const fontSizeMain = Math.max(12, Math.round(canvas.width / 40));
-      ctx.font = `bold ${fontSizeMain}px "Courier New", monospace`;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(`CLOSURE STAMP: ${timestampStr}`, 12, canvas.height - (bannerHeight * 0.52));
-
-      const curUserStr = STATE.currentUser ? STATE.currentUser.name : 'Technician';
-      ctx.font = `${Math.max(10, fontSizeMain - 2)}px "Courier New", monospace`;
-      ctx.fillStyle = '#6ee7b7';
-      ctx.fillText(`BY: ${curUserStr} | STATUS: RESOLVED | GPS: ${STATE.userGps.text}`, 12, canvas.height - (bannerHeight * 0.18));
-
-      STATE.stagedClosurePhoto = canvas.toDataURL('image/jpeg', 0.65);
+      STATE.stagedClosurePhoto = canvas.toDataURL('image/jpeg', 0.50);
       STATE.removeClosurePhotoFlag = false;
+
+      // Immediately persist & reflect in snag store and Admin page
+      if (STATE.activeDetailSnagId) {
+        const activeSnag = snagsStore.find(s => s.id === STATE.activeDetailSnagId);
+        if (activeSnag) {
+          activeSnag.closurePhoto = STATE.stagedClosurePhoto;
+          activeSnag.closureTimestamp = timestampStr;
+          activeSnag.closureUploadedBy = curUserStr;
+          activeSnag.status = 'Resolved';
+
+          saveSnagsState();
+
+          if (STATE.isFirebaseActive && STATE.db) {
+            STATE.db.collection('snags').doc(activeSnag.id).update({
+              status: 'Resolved',
+              closurePhoto: activeSnag.closurePhoto,
+              closureTimestamp: activeSnag.closureTimestamp,
+              closureUploadedBy: activeSnag.closureUploadedBy
+            }).then(() => {
+              console.log('✅ Closure photo synced live to Cloud Firestore');
+            }).catch(err => {
+              console.error('❌ Cloud Firestore sync error:', err);
+            });
+          }
+
+          renderApp();
+        }
+      }
 
       // Update Preview Elements in Modal
       renderClosurePreviewState(STATE.stagedClosurePhoto, timestampStr, STATE.currentUser?.name || 'Technician');

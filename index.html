@@ -410,13 +410,14 @@
             <table class="w-full text-left text-xs text-slate-300">
               <thead class="bg-slate-900/80 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
                 <tr>
-                  <th class="px-4 py-3">Photo & ID</th>
-                  <th class="px-4 py-3">Date & Realtime</th>
-                  <th class="px-4 py-3">Building / Floor / Location</th>
-                  <th class="px-4 py-3">Category</th>
-                  <th class="px-4 py-3">Assigned Team</th>
-                  <th class="px-4 py-3">Status</th>
-                  <th class="px-4 py-3 text-right">Actions</th>
+                  <th class="px-3 py-3">Initial Photo & ID</th>
+                  <th class="px-3 py-3">Closure Evidence Photo</th>
+                  <th class="px-3 py-3">Date & Time</th>
+                  <th class="px-3 py-3">Building / Floor / Location</th>
+                  <th class="px-3 py-3">Category</th>
+                  <th class="px-3 py-3">Assigned Team</th>
+                  <th class="px-3 py-3">Status</th>
+                  <th class="px-3 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody id="adminSnagsTableBody" class="divide-y divide-slate-800/60">
@@ -891,7 +892,7 @@
           </div>
 
           <div class="flex justify-end pt-1">
-            <button onclick="saveDetailStatusUpdate()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 flex items-center gap-2 transition active:scale-95">
+            <button type="button" onclick="saveDetailStatusUpdate()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 flex items-center gap-2 transition active:scale-95">
               <i class="fa-solid fa-floppy-disk"></i> Save Status & Work Remark
             </button>
           </div>
