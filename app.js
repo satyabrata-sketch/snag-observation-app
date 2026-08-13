@@ -1268,9 +1268,36 @@ function updateSnagStatusAndRemark(snagId, newStatus, remarkText, closurePhotoDa
   renderApp();
 }
 
+// Trigger Closure File Input Picker
+function triggerClosureFileSelect() {
+  const input = document.getElementById('closureFileInput');
+  if (input) {
+    input.value = '';
+    input.click();
+  }
+}
+
+// Fullscreen Photo Lightbox Functions
+function openPhotoLightbox(photoUrl, titleStr) {
+  if (!photoUrl) return;
+  const modal = document.getElementById('photoLightboxModal');
+  const img = document.getElementById('lightboxImage');
+  const title = document.getElementById('lightboxTitle');
+  if (modal && img) {
+    img.src = photoUrl;
+    if (title) title.innerHTML = `<i class="fa-solid fa-expand text-cyan-400 mr-1.5"></i> ${titleStr || 'Photo Evidence View'}`;
+    modal.classList.remove('hidden');
+  }
+}
+
+function closePhotoLightbox() {
+  const modal = document.getElementById('photoLightboxModal');
+  if (modal) modal.classList.add('hidden');
+}
+
 // Closure Photo Upload Handlers
 function handleClosureFileInput(e) {
-  const file = e.target.files[0];
+  const file = e.target.files && e.target.files[0];
   if (!file) return;
 
   const reader = new FileReader();
@@ -1320,12 +1347,12 @@ function handleClosureFileInput(e) {
           saveSnagsState();
 
           if (STATE.isFirebaseActive && STATE.db) {
-            STATE.db.collection('snags').doc(activeSnag.id).update({
+            STATE.db.collection('snags').doc(activeSnag.id).set({
               status: 'Resolved',
               closurePhoto: activeSnag.closurePhoto,
               closureTimestamp: activeSnag.closureTimestamp,
               closureUploadedBy: activeSnag.closureUploadedBy
-            }).then(() => {
+            }, { merge: true }).then(() => {
               console.log('✅ Closure photo synced live to Cloud Firestore');
             }).catch(err => {
               console.error('❌ Cloud Firestore sync error:', err);
@@ -1344,6 +1371,8 @@ function handleClosureFileInput(e) {
       if (statusSel && statusSel.value !== 'Resolved') {
         statusSel.value = 'Resolved';
       }
+
+      if (e.target) e.target.value = '';
     };
     img.src = evt.target.result;
   };
@@ -1362,11 +1391,12 @@ function renderClosurePreviewState(photoUrl, timestamp, uploadedBy) {
 
   if (photoUrl) {
     if (container) {
-      container.className = "relative rounded-xl overflow-hidden bg-black border border-emerald-500/50 h-56 flex flex-col justify-between";
+      container.className = "relative rounded-xl overflow-hidden bg-black border border-emerald-500/50 h-56 flex flex-col justify-between group cursor-pointer";
+      container.onclick = () => openPhotoLightbox(photoUrl, 'Closure Photo (Resolved Evidence)');
       container.innerHTML = `
-        <img src="${photoUrl}" class="w-full h-full object-contain mx-auto" alt="Closure Photo">
+        <img src="${photoUrl}" class="w-full h-full object-contain mx-auto transition-transform duration-300 group-hover:scale-105" alt="Closure Photo">
         <div class="p-2 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between text-[10px] font-mono text-emerald-400">
-          <span><i class="fa-solid fa-circle-check mr-1 text-emerald-400"></i>Resolved Evidence</span>
+          <span><i class="fa-solid fa-circle-check mr-1 text-emerald-400"></i>Resolved Evidence (Click to Zoom)</span>
           <span>By: ${uploadedBy}</span>
         </div>
       `;
@@ -1376,6 +1406,8 @@ function renderClosurePreviewState(photoUrl, timestamp, uploadedBy) {
       dateEl.className = 'text-[10px] font-mono text-emerald-400 font-bold';
     }
     if (thumb) {
+      thumb.className = "w-14 h-14 rounded-lg bg-slate-900 border border-emerald-500/50 flex items-center justify-center overflow-hidden shrink-0 cursor-pointer";
+      thumb.onclick = () => openPhotoLightbox(photoUrl, 'Closure Photo (Resolved Evidence)');
       thumb.innerHTML = `<img src="${photoUrl}" class="w-full h-full object-cover">`;
     }
     if (title) title.textContent = "🟢 Closure Photo Attached";
@@ -1383,18 +1415,19 @@ function renderClosurePreviewState(photoUrl, timestamp, uploadedBy) {
     if (removeBtn) removeBtn.classList.remove('hidden');
     if (btnText) btnText.textContent = "Change Closure Photo";
     if (tag) {
-      tag.textContent = "🟢 Closure photo ready to save";
+      tag.textContent = "🟢 Closure photo saved & synced";
       tag.className = "text-[10px] font-mono text-emerald-400 font-bold";
     }
   } else {
     if (container) {
-      container.className = "relative rounded-xl overflow-hidden bg-slate-950 border border-dashed border-slate-700 h-56 flex flex-col items-center justify-center text-center p-3";
+      container.className = "relative rounded-xl overflow-hidden bg-slate-950 border border-dashed border-slate-700 h-56 flex flex-col items-center justify-center text-center p-3 cursor-pointer";
+      container.onclick = () => triggerClosureFileSelect();
       container.innerHTML = `
-        <div class="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 text-slate-500 flex items-center justify-center text-xl mb-2">
+        <div class="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 text-cyan-400 flex items-center justify-center text-xl mb-2 hover:scale-110 transition">
           <i class="fa-solid fa-camera"></i>
         </div>
-        <p class="text-xs text-slate-400 font-medium">No closure photo uploaded yet</p>
-        <p class="text-[10px] text-slate-500 mt-1 max-w-xs">Technician can upload closure photo below when resolving this snag observation.</p>
+        <p class="text-xs text-white font-bold">Click to Upload Closure Photo</p>
+        <p class="text-[10px] text-slate-400 mt-1 max-w-xs">Technician can upload photo showing fixed/closed snag observation.</p>
       `;
     }
     if (dateEl) {
@@ -1402,6 +1435,8 @@ function renderClosurePreviewState(photoUrl, timestamp, uploadedBy) {
       dateEl.className = 'text-[10px] font-mono text-slate-500';
     }
     if (thumb) {
+      thumb.className = "w-14 h-14 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0 cursor-pointer";
+      thumb.onclick = () => triggerClosureFileSelect();
       thumb.innerHTML = `<i class="fa-solid fa-image text-slate-600 text-xl"></i>`;
     }
     if (title) title.textContent = "No Closure Photo Attached";
@@ -1420,6 +1455,26 @@ function removeClosurePhoto() {
   STATE.removeClosurePhotoFlag = true;
   const fileInput = document.getElementById('closureFileInput');
   if (fileInput) fileInput.value = '';
+  
+  if (STATE.activeDetailSnagId) {
+    const activeSnag = snagsStore.find(s => s.id === STATE.activeDetailSnagId);
+    if (activeSnag) {
+      delete activeSnag.closurePhoto;
+      delete activeSnag.closureTimestamp;
+      delete activeSnag.closureUploadedBy;
+      saveSnagsState();
+
+      if (STATE.isFirebaseActive && STATE.db) {
+        STATE.db.collection('snags').doc(activeSnag.id).update({
+          closurePhoto: null,
+          closureTimestamp: null,
+          closureUploadedBy: null
+        });
+      }
+      renderApp();
+    }
+  }
+
   renderClosurePreviewState(null, '', '');
 }
 
@@ -1435,7 +1490,12 @@ function openDetailModal(snagId) {
   if (fileInput) fileInput.value = '';
 
   document.getElementById('detailSnagId').textContent = snag.id;
-  document.getElementById('detailImage').src = snag.photo;
+  const detailImg = document.getElementById('detailImage');
+  if (detailImg) {
+    detailImg.src = snag.photo;
+    detailImg.className = "w-full h-full object-contain mx-auto cursor-pointer transition-transform duration-300 hover:scale-105";
+    detailImg.onclick = () => openPhotoLightbox(snag.photo, 'Initial Defect Photo');
+  }
   document.getElementById('detailDate').textContent = snag.timestamp;
   document.getElementById('detailGps').textContent = snag.gps || 'Site Coordinates';
   document.getElementById('detailLocation').textContent = snag.location;

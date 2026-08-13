@@ -872,10 +872,10 @@
               </div>
 
               <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
-                <label class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs cursor-pointer shadow flex items-center gap-1.5 transition shrink-0">
+                <button type="button" onclick="triggerClosureFileSelect()" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs cursor-pointer shadow flex items-center gap-1.5 transition shrink-0 active:scale-95">
                   <i class="fa-solid fa-upload"></i> <span id="closureBtnText">Upload Closure Photo</span>
-                  <input type="file" id="closureFileInput" accept="image/*" capture="environment" onchange="handleClosureFileInput(event)" class="hidden">
-                </label>
+                </button>
+                <input type="file" id="closureFileInput" accept="image/*" capture="environment" onchange="handleClosureFileInput(event)" class="hidden">
                 <button type="button" id="btnRemoveClosurePhoto" onclick="removeClosurePhoto()" class="hidden px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-rose-400 font-bold text-xs border border-rose-500/30 transition" title="Remove Closure Photo">
                   <i class="fa-solid fa-trash"></i>
                 </button>
@@ -1030,6 +1030,33 @@
         </button>
         <button onclick="closeUserProfileModal()" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition">
           Close Profile
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 4: FULL-SCREEN PHOTO LIGHTBOX / ENLARGED VIEW MODAL                 -->
+  <!-- ========================================================================= -->
+  <div id="photoLightboxModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div class="glass-panel bg-slate-950/95 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden p-4 space-y-3 shadow-2xl relative flex flex-col justify-between">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+        <h4 id="lightboxTitle" class="text-sm font-extrabold text-white flex items-center gap-2">
+          <i class="fa-solid fa-expand text-cyan-400"></i> Photo Evidence View
+        </h4>
+        <button type="button" onclick="closePhotoLightbox()" class="text-slate-400 hover:text-white text-xl">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="relative flex-1 min-h-[50vh] max-h-[75vh] flex items-center justify-center bg-black rounded-xl overflow-hidden p-2">
+        <img id="lightboxImage" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt="Enlarged Photo View">
+      </div>
+
+      <div class="flex justify-end pt-1">
+        <button type="button" onclick="closePhotoLightbox()" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs">
+          Close Photo View
         </button>
       </div>
     </div>
