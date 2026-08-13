@@ -1001,7 +1001,7 @@ function renderAdminSnagsTable() {
       <tr class="hover:bg-slate-800/40 transition">
         <td class="px-3 py-3 font-mono">
           <div class="flex items-center gap-2.5">
-            <img src="${snag.photo}" class="w-10 h-10 rounded-lg object-cover border border-slate-700 cursor-pointer" onclick="openDetailModal('${snag.id}')" alt="Initial Defect Photo" title="Click to View Detail">
+            <img src="${snag.photo}" class="w-10 h-10 rounded-lg object-cover border border-slate-700 cursor-pointer hover:scale-110 transition shadow" onclick="downloadAndZoomPhoto('${snag.photo}', '${snag.id}_InitialDefect.jpg', 'Initial Defect Photo (${snag.id})')" alt="Initial Defect Photo" title="Click to Download & View Clear High-Res Photo">
             <div>
               <div class="font-bold text-cyan-400 text-xs">${snag.id}</div>
               <div class="text-[10px] text-slate-400">${snag.priority} Priority</div>
@@ -1010,8 +1010,8 @@ function renderAdminSnagsTable() {
         </td>
         <td class="px-3 py-3 font-mono">
           ${snag.closurePhoto ? `
-            <div class="flex items-center gap-2 cursor-pointer" onclick="openDetailModal('${snag.id}')" title="Click to View Detail">
-              <img src="${snag.closurePhoto}" class="w-10 h-10 rounded-lg object-cover border-2 border-emerald-500/70 shadow" alt="Closure Photo">
+            <div class="flex items-center gap-2 cursor-pointer" onclick="downloadAndZoomPhoto('${snag.closurePhoto}', '${snag.id}_ClosurePhoto.jpg', 'Closure Photo Evidence (${snag.id})')" title="Click to Download & View Clear High-Res Photo">
+              <img src="${snag.closurePhoto}" class="w-10 h-10 rounded-lg object-cover border-2 border-emerald-500/70 shadow hover:scale-110 transition" alt="Closure Photo">
               <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30">✓ Uploaded</span>
             </div>
           ` : `
@@ -1410,7 +1410,26 @@ function triggerClosureFileSelect() {
   }
 }
 
-// Fullscreen Photo Lightbox Functions
+// Fullscreen Photo Lightbox & Instant Clear Photo Downloader
+function downloadAndZoomPhoto(photoUrl, filenameStr, titleStr) {
+  if (!photoUrl) return;
+
+  // 1. Download full-resolution clear picture directly to user/admin PC/device
+  try {
+    const a = document.createElement('a');
+    a.href = photoUrl;
+    a.download = filenameStr || `Snag_Photo_${Date.now()}.jpg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (e) {
+    console.warn('Auto download clear picture error:', e);
+  }
+
+  // 2. Open full-screen clear viewer modal
+  openPhotoLightbox(photoUrl, titleStr);
+}
+
 function openPhotoLightbox(photoUrl, titleStr) {
   if (!photoUrl) return;
   const modal = document.getElementById('photoLightboxModal');
@@ -1527,11 +1546,11 @@ function renderClosurePreviewState(photoUrl, timestamp, uploadedBy) {
   if (photoUrl) {
     if (container) {
       container.className = "relative rounded-xl overflow-hidden bg-black border border-emerald-500/50 h-56 flex flex-col justify-between group cursor-pointer";
-      container.onclick = () => openPhotoLightbox(photoUrl, 'Closure Photo (Resolved Evidence)');
+      container.onclick = () => downloadAndZoomPhoto(photoUrl, `${STATE.activeDetailSnagId || 'Closure'}_ClosurePhoto.jpg`, 'Closure Photo (Resolved Evidence)');
       container.innerHTML = `
-        <img src="${photoUrl}" class="w-full h-full object-contain mx-auto transition-transform duration-300 group-hover:scale-105" alt="Closure Photo">
+        <img src="${photoUrl}" class="w-full h-full object-contain mx-auto transition-transform duration-300 group-hover:scale-105" alt="Closure Photo" title="Click to Download & View Clear Photo">
         <div class="p-2 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between text-[10px] font-mono text-emerald-400">
-          <span><i class="fa-solid fa-circle-check mr-1 text-emerald-400"></i>Resolved Evidence (Click to Zoom)</span>
+          <span><i class="fa-solid fa-circle-check mr-1 text-emerald-400"></i>Resolved Evidence (Click to Download & View Clear Photo)</span>
           <span>By: ${uploadedBy}</span>
         </div>
       `;
@@ -1542,8 +1561,8 @@ function renderClosurePreviewState(photoUrl, timestamp, uploadedBy) {
     }
     if (thumb) {
       thumb.className = "w-14 h-14 rounded-lg bg-slate-900 border border-emerald-500/50 flex items-center justify-center overflow-hidden shrink-0 cursor-pointer";
-      thumb.onclick = () => openPhotoLightbox(photoUrl, 'Closure Photo (Resolved Evidence)');
-      thumb.innerHTML = `<img src="${photoUrl}" class="w-full h-full object-cover">`;
+      thumb.onclick = () => downloadAndZoomPhoto(photoUrl, `${STATE.activeDetailSnagId || 'Closure'}_ClosurePhoto.jpg`, 'Closure Photo (Resolved Evidence)');
+      thumb.innerHTML = `<img src="${photoUrl}" class="w-full h-full object-cover" title="Click to Download & View Clear Photo">`;
     }
     if (title) title.textContent = "🟢 Closure Photo Attached";
     if (sub) sub.textContent = `Uploaded by ${uploadedBy} (${timestamp || 'Just now'})`;
@@ -1629,7 +1648,8 @@ function openDetailModal(snagId) {
   if (detailImg) {
     detailImg.src = snag.photo;
     detailImg.className = "w-full h-full object-contain mx-auto cursor-pointer transition-transform duration-300 hover:scale-105";
-    detailImg.onclick = () => openPhotoLightbox(snag.photo, 'Initial Defect Photo');
+    detailImg.onclick = () => downloadAndZoomPhoto(snag.photo, `${snag.id}_InitialDefect.jpg`, `Initial Defect Photo (${snag.id})`);
+    detailImg.title = "Click to Download & View Clear High-Res Photo";
   }
   document.getElementById('detailDate').textContent = snag.timestamp;
   document.getElementById('detailGps').textContent = snag.gps || 'Site Coordinates';
