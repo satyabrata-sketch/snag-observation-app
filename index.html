@@ -2,9 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Snag Observation System</title>
   
+  <!-- App Favicon & Apple Touch Icon -->
+  <link rel="icon" type="image/png" href="image (10).png">
+  <link rel="apple-touch-icon" href="image (10).png">
+
   <!-- Google Fonts: Plus Jakarta Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -47,71 +51,75 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 
-  <!-- Custom CSS -->
+  <!-- Custom Design System CSS -->
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="antialiased text-slate-100 min-h-screen flex flex-col">
+<body class="antialiased text-slate-100 min-h-screen flex flex-col bg-slate-950">
 
-  <!-- Floating Toast Banner Container for FCM Push & Live Alerts -->
-  <div id="inAppToastContainer" class="fixed top-16 right-4 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+  <!-- Floating Toast Banner Container for FCM Push & Live Assignment Alerts -->
+  <div id="inAppToastContainer" class="fixed top-16 right-3 sm:right-4 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-2 sm:px-0"></div>
 
   <!-- TOP NAVIGATION HEADER -->
-  <header class="glass-nav sticky top-0 z-40 px-4 py-3 border-b border-slate-700/50">
-    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+  <header class="glass-nav sticky top-0 z-40 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-3 sm:gap-4">
       
-      <!-- Brand & Status -->
-      <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-            <i class="fa-solid fa-clipboard-check text-white text-xl"></i>
-          </div>
+      <!-- Top Row on Mobile: Brand, Clock, and Cloud Status -->
+      <div class="flex items-center justify-between w-full lg:w-auto gap-3">
+        <div class="flex items-center gap-2.5 sm:gap-3">
+          <img src="image (10).png" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-contain shadow-lg shadow-cyan-500/20 shrink-0 border border-slate-700/80" alt="Snag Observation Logo">
           <div>
-            <h1 class="font-extrabold text-lg sm:text-xl tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-              SnagObservation <span class="text-cyan-400 text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30">PRO</span>
-            </h1>
-            <p class="text-xs text-slate-400 font-medium flex items-center gap-2">
-              <span id="headerLiveClock" class="font-mono text-cyan-300">--:--:--</span>
+            <div class="flex items-center gap-1.5">
+              <h1 class="font-extrabold text-base sm:text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+                SnagObservation
+              </h1>
+              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">PRO</span>
+            </div>
+            <p class="text-[11px] text-slate-400 font-medium flex items-center gap-2">
+              <i class="fa-regular fa-clock text-cyan-400 text-[10px]"></i>
+              <span id="headerLiveClock" class="font-mono text-cyan-300 font-semibold">--:--:--</span>
             </p>
           </div>
         </div>
 
-        <!-- Connection Indicator Pill (Mobile & Desktop) -->
-        <div class="flex items-center gap-2">
-          <span id="firebaseStatusPill" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+        <!-- Connection Indicator Pill -->
+        <div class="flex items-center gap-2 shrink-0">
+          <span id="firebaseStatusPill" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span id="firebaseStatusText">Local Database Mode</span>
+            <span id="firebaseStatusText" class="truncate max-w-[120px] sm:max-w-none">Live Connected</span>
           </span>
         </div>
       </div>
 
-      <!-- User Role Selector & Controls -->
-      <div class="flex flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto justify-between md:justify-end">
+      <!-- Controls Row: Active User Profile & Section Switcher -->
+      <div class="flex flex-wrap items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full lg:w-auto">
         
         <!-- Active Logged In User Pill -->
-        <div id="loggedInUserPill" class="flex items-center gap-2 bg-slate-800/90 border border-slate-700 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-1.5 shadow-inner max-w-full overflow-hidden">
-          <i class="fa-solid fa-user-check text-emerald-400 text-sm shrink-0"></i>
-          <div class="text-left cursor-pointer min-w-0" onclick="openUserProfileModal()" title="Click to View Profile">
-            <span id="headerUserName" class="text-xs font-bold text-white block leading-tight hover:text-cyan-300 truncate max-w-[100px] sm:max-w-[150px]">Personnel</span>
-            <span id="headerUserRole" class="text-[10px] text-slate-400 block leading-tight truncate max-w-[100px] sm:max-w-[150px]">Role (Category)</span>
+        <div id="loggedInUserPill" class="flex items-center gap-2 bg-slate-900/90 border border-slate-700/80 rounded-xl px-2.5 py-1.5 shadow-inner max-w-full overflow-hidden">
+          <div class="w-7 h-7 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center justify-center text-xs shrink-0 cursor-pointer" onclick="openUserProfileModal()">
+            <i class="fa-solid fa-user"></i>
           </div>
-          <button onclick="testNotificationAlert()" class="ml-0.5 px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 text-[10px] font-bold transition flex items-center gap-1 shrink-0" title="Test Ring & Vibration Notification">
-            <i class="fa-solid fa-bell"></i> Test Ring
+          <div class="text-left cursor-pointer min-w-0 pr-1" onclick="openUserProfileModal()" title="Click to View Profile">
+            <span id="headerUserName" class="text-xs font-bold text-white block leading-tight hover:text-cyan-300 truncate max-w-[110px] sm:max-w-[140px]">Personnel</span>
+            <span id="headerUserRole" class="text-[10px] text-slate-400 block leading-tight truncate max-w-[110px] sm:max-w-[140px]">Role (Category)</span>
+          </div>
+          <button onclick="testNotificationAlert()" class="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[10px] font-bold transition flex items-center gap-1 shrink-0 border border-amber-500/30" title="Test Ring & Vibration Alert">
+            <i class="fa-solid fa-bell"></i> <span class="hidden sm:inline">Test Alert</span>
           </button>
-          <button onclick="openUserProfileModal()" class="ml-0.5 px-2 py-1 rounded bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 text-[10px] font-bold transition flex items-center gap-1 shrink-0" title="View My Profile">
-            <i class="fa-solid fa-id-card"></i> Profile
+          <button onclick="openUserProfileModal()" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 text-[10px] font-bold transition flex items-center gap-1 shrink-0 border border-slate-700" title="View Profile">
+            <i class="fa-solid fa-id-card"></i>
           </button>
-          <button onclick="handleUserLogout()" class="px-2 py-1 rounded bg-slate-700 hover:bg-rose-900/40 text-slate-300 hover:text-rose-400 text-[10px] font-bold transition flex items-center gap-1 shrink-0" title="Logout">
-            <i class="fa-solid fa-right-from-bracket"></i> Logout
+          <button onclick="handleUserLogout()" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 text-[10px] font-bold transition flex items-center gap-1 shrink-0 border border-slate-700" title="Logout">
+            <i class="fa-solid fa-right-from-bracket"></i>
           </button>
         </div>
 
         <!-- Section Navigation Switcher Tabs (User vs Admin) -->
-        <div class="flex bg-slate-800/90 p-1 rounded-xl border border-slate-700/60 shadow-md shrink-0">
-          <button id="navUserTab" onclick="switchSection('user')" class="px-2.5 py-1.5 sm:px-3.5 sm:py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-cyan-600 text-white shadow">
-            <i class="fa-solid fa-camera"></i> User Section
+        <div class="flex bg-slate-900/90 p-1 rounded-xl border border-slate-700/80 shadow-md shrink-0">
+          <button id="navUserTab" onclick="switchSection('user')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-cyan-600 text-white shadow">
+            <i class="fa-solid fa-camera"></i> User App
           </button>
-          <button id="navAdminTab" onclick="switchSection('admin')" class="px-2.5 py-1.5 sm:px-3.5 sm:py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white">
-            <i class="fa-solid fa-shield-halved text-amber-400"></i> Admin Panel 🔒
+          <button id="navAdminTab" onclick="switchSection('admin')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white">
+            <i class="fa-solid fa-shield-halved text-amber-400"></i> Admin 🔒
           </button>
         </div>
       </div>
@@ -120,115 +128,151 @@
 
 
   <!-- MAIN CONTENT CONTAINER -->
-  <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+  <main class="flex-grow max-w-7xl w-full mx-auto p-3 sm:p-5 md:p-6 space-y-5 sm:space-y-6">
 
     <!-- ========================================================================= -->
     <!-- SECTION 1: USER SECTION (Photo Capture, Observation Form, Category Feed)  -->
     <!-- ========================================================================= -->
-    <section id="userSection" class="space-y-6">
+    <section id="userSection" class="space-y-5 sm:space-y-6">
 
       <!-- User Active Banner & Hero Header -->
-      <div class="glass-panel rounded-2xl p-6 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      <div class="glass-panel rounded-2xl p-4 sm:p-6 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:gap-6 border border-slate-800">
         <div class="space-y-2 z-10">
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
             <span id="userCategoryBadge" class="badge-electrical px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
               <i class="fa-solid fa-bolt"></i> Category
             </span>
-            <span id="userRoleTag" class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-300">Personnel Role</span>
+            <span id="userRoleTag" class="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">Personnel Role</span>
           </div>
-          <h2 class="text-2xl font-extrabold text-white tracking-tight">
+          <h2 class="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
             Welcome back, <span id="currentUserNameDisplay" class="text-cyan-400">User</span>
           </h2>
-          <p class="text-xs text-slate-400 max-w-xl">
-            Capture new snag observations with auto real-time date/time stamps and GPS coordinates. Snags captured in your category (<span id="userCategoryText" class="font-semibold text-white">General</span>) are routed directly to your team.
+          <p class="text-xs text-slate-400 max-w-2xl leading-relaxed">
+            Capture new snag observations with instant date/time stamps & GPS coordinates. New snags assigned to your category (<span id="userCategoryText" class="font-semibold text-white">General</span>) or name will automatically notify and vibrate your device!
           </p>
         </div>
 
-        <div class="flex flex-wrap items-center gap-3 z-10 w-full md:w-auto">
-          <button onclick="openUserProfileModal()" class="flex-1 md:flex-initial px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition shadow">
-            <i class="fa-solid fa-address-card text-cyan-400 text-base"></i> My Profile
+        <div class="flex flex-wrap items-center gap-2.5 sm:gap-3 z-10 w-full md:w-auto">
+          <button onclick="openUserProfileModal()" class="flex-1 md:flex-initial px-4 py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition shadow active:scale-95">
+            <i class="fa-solid fa-address-card text-cyan-400 text-sm"></i> My Profile
           </button>
-          <button onclick="openCaptureModal()" class="flex-1 md:flex-initial px-5 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-sm shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 transition active:scale-95">
-            <i class="fa-solid fa-circle-dot text-rose-400 animate-ping text-xs"></i>
-            <i class="fa-solid fa-camera text-lg"></i>
+          <button onclick="openCaptureModal()" class="flex-1 md:flex-initial px-5 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 transition active:scale-95">
+            <i class="fa-solid fa-camera text-base"></i>
             Capture & Report Snag
           </button>
         </div>
       </div>
 
       <!-- Quick Category Statistics for Current User -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="glass-panel p-4 rounded-xl flex items-center gap-3">
-          <div class="w-10 h-10 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        
+        <div class="glass-panel p-3.5 sm:p-4 rounded-xl flex items-center gap-3 border-l-4 border-l-cyan-500">
+          <div class="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center shrink-0">
             <i class="fa-solid fa-layer-group text-lg"></i>
           </div>
           <div>
-            <div class="text-xs text-slate-400 font-medium">Assigned Snags</div>
-            <div id="statUserTotal" class="text-xl font-extrabold text-white">0</div>
+            <div class="text-[11px] sm:text-xs text-slate-400 font-medium">Assigned Snags</div>
+            <div id="statUserTotal" class="text-xl sm:text-2xl font-black text-white">0</div>
           </div>
         </div>
 
-        <div class="glass-panel p-4 rounded-xl flex items-center gap-3">
-          <div class="w-10 h-10 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center">
+        <div class="glass-panel p-3.5 sm:p-4 rounded-xl flex items-center gap-3 border-l-4 border-l-rose-500">
+          <div class="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center shrink-0">
             <i class="fa-solid fa-triangle-exclamation text-lg"></i>
           </div>
           <div>
-            <div class="text-xs text-slate-400 font-medium">Open Defects</div>
-            <div id="statUserOpen" class="text-xl font-extrabold text-rose-400">0</div>
+            <div class="text-[11px] sm:text-xs text-slate-400 font-medium">Open Defects</div>
+            <div id="statUserOpen" class="text-xl sm:text-2xl font-black text-rose-400">0</div>
           </div>
         </div>
 
-        <div class="glass-panel p-4 rounded-xl flex items-center gap-3">
-          <div class="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
+        <div class="glass-panel p-3.5 sm:p-4 rounded-xl flex items-center gap-3 border-l-4 border-l-amber-500">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center shrink-0">
             <i class="fa-solid fa-clock-rotate-left text-lg"></i>
           </div>
           <div>
-            <div class="text-xs text-slate-400 font-medium">In Progress</div>
-            <div id="statUserProgress" class="text-xl font-extrabold text-amber-400">0</div>
+            <div class="text-[11px] sm:text-xs text-slate-400 font-medium">In Progress</div>
+            <div id="statUserProgress" class="text-xl sm:text-2xl font-black text-amber-400">0</div>
           </div>
         </div>
 
-        <div class="glass-panel p-4 rounded-xl flex items-center gap-3">
-          <div class="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
+        <div class="glass-panel p-3.5 sm:p-4 rounded-xl flex items-center gap-3 border-l-4 border-l-emerald-500">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
             <i class="fa-solid fa-circle-check text-lg"></i>
           </div>
           <div>
-            <div class="text-xs text-slate-400 font-medium">Resolved</div>
-            <div id="statUserResolved" class="text-xl font-extrabold text-emerald-400">0</div>
+            <div class="text-[11px] sm:text-xs text-slate-400 font-medium">Resolved</div>
+            <div id="statUserResolved" class="text-xl sm:text-2xl font-black text-emerald-400">0</div>
           </div>
         </div>
       </div>
 
-      <!-- User Feed Filter & Snag Observation Grid -->
-      <div class="space-y-4">
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div class="flex items-center gap-2">
-            <h3 class="text-lg font-bold text-white flex items-center gap-2">
-              <i class="fa-solid fa-list-check text-cyan-400"></i> My Category Observations Feed
-            </h3>
-            <span id="userFeedCount" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">0 items</span>
+      <!-- User Feed Section Navigation Tabs & Filter Toolbar -->
+      <div class="space-y-3 sm:space-y-4">
+        
+        <!-- SECTION TABS: "Assigned to Me" vs "All Snags (All Categories & Others)" vs "Raised by Me" -->
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+          <div class="flex flex-wrap bg-slate-900/90 p-1 rounded-xl border border-slate-800 gap-1 w-full md:w-auto">
+            <button id="userTabAssigned" onclick="switchUserFeedTab('assigned')" class="tab-btn active flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 border border-cyan-500/30">
+              <i class="fa-solid fa-bolt text-amber-400"></i>
+              <span>Assigned to Me</span>
+              <span id="tabCountAssigned" class="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 font-mono font-bold">0</span>
+            </button>
+
+            <button id="userTabAll" onclick="switchUserFeedTab('all')" class="tab-btn flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 text-slate-400 hover:text-white">
+              <i class="fa-solid fa-globe text-cyan-400"></i>
+              <span>All Snags (All Categories & Users)</span>
+              <span id="tabCountAll" class="px-2 py-0.5 rounded-full text-[10px] bg-cyan-500/20 text-cyan-300 font-mono font-bold">0</span>
+            </button>
+
+            <button id="userTabRaised" onclick="switchUserFeedTab('raised')" class="tab-btn flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 text-slate-400 hover:text-white">
+              <i class="fa-solid fa-hand-holding-hand text-purple-400"></i>
+              <span>Raised by Me</span>
+              <span id="tabCountRaised" class="px-2 py-0.5 rounded-full text-[10px] bg-purple-500/20 text-purple-300 font-mono font-bold">0</span>
+            </button>
           </div>
 
-          <div class="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-            <select id="userFilterScope" onchange="renderUserSnagsFeed()" class="bg-slate-800 border border-slate-700 text-xs text-slate-200 rounded-xl px-3 py-2 focus:outline-none font-semibold">
-              <option value="all">🌐 All My Snags (Raised & Assigned)</option>
-              <option value="raised">🙋‍♂️ Raised by Me</option>
-              <option value="assigned">⚡ Assigned to My Team</option>
+          <div class="flex items-center gap-2 text-xs text-slate-400 font-mono self-end md:self-auto">
+            <span id="userFeedHeaderTitle" class="font-bold text-white">Assigned to Me:</span>
+            <span id="userFeedCount" class="px-2 py-0.5 rounded-full bg-slate-900 text-cyan-400 border border-slate-700 font-bold">0 items</span>
+          </div>
+        </div>
+
+        <!-- Filter & Search Toolbar -->
+        <div class="glass-panel p-3 sm:p-4 rounded-xl flex flex-col md:flex-row items-center justify-between gap-2.5 sm:gap-3 border border-slate-800">
+          
+          <!-- Category Quick Filter -->
+          <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            <div class="flex items-center gap-1.5 text-xs text-slate-400 font-semibold mr-1">
+              <i class="fa-solid fa-filter text-cyan-400"></i> Filter:
+            </div>
+
+            <select id="userFilterCategory" onchange="renderUserSnagsFeed()" class="flex-1 sm:flex-initial bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-xl px-3 py-2 focus:outline-none font-semibold cursor-pointer">
+              <option value="all">All Categories</option>
+              <option value="Electrical">⚡ Electrical</option>
+              <option value="Plumbing">🔧 Plumbing</option>
+              <option value="Carpentry">🪛 Carpentry</option>
+              <option value="Painting">🎨 Painting</option>
+              <option value="General">📦 General</option>
             </select>
 
-            <select id="userFilterStatus" onchange="renderUserSnagsFeed()" class="bg-slate-800 border border-slate-700 text-xs text-slate-200 rounded-xl px-3 py-2 focus:outline-none font-semibold">
+            <select id="userFilterStatus" onchange="renderUserSnagsFeed()" class="flex-1 sm:flex-initial bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-xl px-3 py-2 focus:outline-none font-semibold cursor-pointer">
               <option value="all">All Statuses</option>
               <option value="Open">🔴 Open</option>
               <option value="In Progress">🟡 In Progress</option>
               <option value="Resolved">🟢 Resolved</option>
             </select>
-            
-            <input type="text" id="userSearchInput" oninput="renderUserSnagsFeed()" placeholder="Search snag ID, location, description..." class="bg-slate-800 border border-slate-700 text-xs text-slate-200 rounded-xl px-3 py-2 focus:outline-none w-full sm:w-56 placeholder-slate-500">
+          </div>
+
+          <!-- Search Input -->
+          <div class="relative w-full md:w-64">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
+            <input type="text" id="userSearchInput" oninput="renderUserSnagsFeed()" placeholder="Search ID, location, technician..." class="w-full bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-xl pl-8 pr-3 py-2 focus:outline-none placeholder-slate-500">
           </div>
         </div>
 
         <!-- Snag Cards Grid -->
-        <div id="userSnagsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div id="userSnagsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           <!-- Populated dynamically via JS -->
         </div>
       </div>
@@ -238,98 +282,97 @@
     <!-- ========================================================================= -->
     <!-- SECTION 2: ADMIN SECTION (Master Tracking, Filters, User Management, PDF)-->
     <!-- ========================================================================= -->
-    <section id="adminSection" class="space-y-6 hidden">
+    <section id="adminSection" class="space-y-5 sm:space-y-6 hidden">
       
       <!-- Admin Sub-Navigation Header Tabs -->
-      <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div class="flex bg-slate-900/90 p-1.5 rounded-xl border border-slate-800 w-full sm:w-auto">
-          <button id="adminTabTracking" onclick="switchAdminTab('tracking')" class="tab-btn active px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 border border-blue-500/30">
+      <div class="flex flex-col lg:flex-row items-center justify-between gap-3 sm:gap-4 border-b border-slate-800 pb-4">
+        <div class="flex bg-slate-900/90 p-1 rounded-xl border border-slate-800 w-full lg:w-auto">
+          <button id="adminTabTracking" onclick="switchAdminTab('tracking')" class="tab-btn active flex-1 lg:flex-initial px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 border border-cyan-500/30">
             <i class="fa-solid fa-chart-pie text-cyan-400"></i> Master Snag Tracking & Reports
           </button>
-          <button id="adminTabUsers" onclick="switchAdminTab('users')" class="tab-btn px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white">
-            <i class="fa-solid fa-users-gear text-amber-400"></i> User & Category Management
+          <button id="adminTabUsers" onclick="switchAdminTab('users')" class="tab-btn flex-1 lg:flex-initial px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 text-slate-400 hover:text-white">
+            <i class="fa-solid fa-users-gear text-amber-400"></i> User Management
           </button>
         </div>
 
         <!-- Report Exporter CTA Buttons & Admin Controls -->
-        <div class="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-          <!-- Preview User Section Button for Admin -->
+        <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
           <button onclick="switchSection('user')" class="px-3.5 py-2 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 font-bold text-xs flex items-center justify-center gap-1.5 transition">
-            <i class="fa-solid fa-eye text-cyan-400"></i> View User Section
+            <i class="fa-solid fa-eye text-cyan-400"></i> User App
           </button>
 
-          <button onclick="exportToExcel()" class="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 font-bold text-xs flex items-center justify-center gap-2 transition">
-            <i class="fa-solid fa-file-excel text-emerald-400 text-sm"></i> Export Excel (.xlsx)
+          <button onclick="exportToExcel()" class="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 font-bold text-xs flex items-center justify-center gap-1.5 transition">
+            <i class="fa-solid fa-file-excel text-emerald-400"></i> Excel (.xlsx)
           </button>
 
-          <button onclick="exportToPDF()" class="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 font-bold text-xs flex items-center justify-center gap-2 transition">
-            <i class="fa-solid fa-file-pdf text-rose-400 text-sm"></i> Export PDF Report (.pdf)
+          <button onclick="exportToPDF()" class="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 font-bold text-xs flex items-center justify-center gap-1.5 transition">
+            <i class="fa-solid fa-file-pdf text-rose-400"></i> PDF Report
           </button>
 
           <button onclick="lockAdminSession()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition" title="Lock Admin Session">
-            <i class="fa-solid fa-lock text-amber-400"></i> Lock Admin
+            <i class="fa-solid fa-lock text-amber-400"></i> Lock
           </button>
         </div>
       </div>
 
       <!-- TAB 1: MASTER SNAG TRACKING CONTENT -->
-      <div id="adminTabTrackingContent" class="space-y-6">
+      <div id="adminTabTrackingContent" class="space-y-5 sm:space-y-6">
 
         <!-- Global Metric Cards -->
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div class="glass-panel p-4 rounded-xl border-l-4 border-l-cyan-500">
-            <div class="text-xs text-slate-400 font-semibold">Total Observations</div>
-            <div id="statAdminTotal" class="text-2xl font-black text-white mt-1">0</div>
-            <div class="text-[10px] text-cyan-400 mt-1">All site areas</div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
+          <div class="glass-panel p-3.5 sm:p-4 rounded-xl border-l-4 border-l-cyan-500">
+            <div class="text-[11px] text-slate-400 font-semibold">Total Observations</div>
+            <div id="statAdminTotal" class="text-xl sm:text-2xl font-black text-white mt-1">0</div>
+            <div class="text-[10px] text-cyan-400 mt-0.5">All site areas</div>
           </div>
-          <div class="glass-panel p-4 rounded-xl border-l-4 border-l-rose-500">
-            <div class="text-xs text-slate-400 font-semibold">Open Snags</div>
-            <div id="statAdminOpen" class="text-2xl font-black text-rose-400 mt-1">0</div>
-            <div class="text-[10px] text-rose-400/80 mt-1">Requires assignment</div>
+          <div class="glass-panel p-3.5 sm:p-4 rounded-xl border-l-4 border-l-rose-500">
+            <div class="text-[11px] text-slate-400 font-semibold">Open Snags</div>
+            <div id="statAdminOpen" class="text-xl sm:text-2xl font-black text-rose-400 mt-1">0</div>
+            <div class="text-[10px] text-rose-400/80 mt-0.5">Requires assignment</div>
           </div>
-          <div class="glass-panel p-4 rounded-xl border-l-4 border-l-amber-500">
-            <div class="text-xs text-slate-400 font-semibold">In Progress</div>
-            <div id="statAdminProgress" class="text-2xl font-black text-amber-400 mt-1">0</div>
-            <div class="text-[10px] text-amber-400/80 mt-1">Technicians working</div>
+          <div class="glass-panel p-3.5 sm:p-4 rounded-xl border-l-4 border-l-amber-500">
+            <div class="text-[11px] text-slate-400 font-semibold">In Progress</div>
+            <div id="statAdminProgress" class="text-xl sm:text-2xl font-black text-amber-400 mt-1">0</div>
+            <div class="text-[10px] text-amber-400/80 mt-0.5">Technicians working</div>
           </div>
-          <div class="glass-panel p-4 rounded-xl border-l-4 border-l-emerald-500">
-            <div class="text-xs text-slate-400 font-semibold">Resolved & Closed</div>
-            <div id="statAdminResolved" class="text-2xl font-black text-emerald-400 mt-1">0</div>
-            <div class="text-[10px] text-emerald-400/80 mt-1">Verified compliant</div>
+          <div class="glass-panel p-3.5 sm:p-4 rounded-xl border-l-4 border-l-emerald-500">
+            <div class="text-[11px] text-slate-400 font-semibold">Resolved & Closed</div>
+            <div id="statAdminResolved" class="text-xl sm:text-2xl font-black text-emerald-400 mt-1">0</div>
+            <div class="text-[10px] text-emerald-400/80 mt-0.5">Verified compliant</div>
           </div>
-          <div class="glass-panel p-4 rounded-xl border-l-4 border-l-purple-500 col-span-2 md:col-span-1">
-            <div class="text-xs text-slate-400 font-semibold">Critical Priority</div>
-            <div id="statAdminCritical" class="text-2xl font-black text-purple-400 mt-1">0</div>
-            <div class="text-[10px] text-purple-400/80 mt-1">High urgency defects</div>
+          <div class="glass-panel p-3.5 sm:p-4 rounded-xl border-l-4 border-l-purple-500 col-span-2 sm:col-span-1">
+            <div class="text-[11px] text-slate-400 font-semibold">Critical Priority</div>
+            <div id="statAdminCritical" class="text-xl sm:text-2xl font-black text-purple-400 mt-1">0</div>
+            <div class="text-[10px] text-purple-400/80 mt-0.5">High urgency defects</div>
           </div>
         </div>
 
-        <!-- Filter & Search Toolbar (Month-wise Filter, Category, Status, Location) -->
-        <div class="glass-panel p-4 rounded-xl space-y-3">
+        <!-- Filter & Search Toolbar -->
+        <div class="glass-panel p-4 rounded-xl space-y-3 border border-slate-800">
           <div class="flex items-center justify-between">
             <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
               <i class="fa-solid fa-filter text-cyan-400"></i> Audit Filters & Date Selection
             </h4>
             <div class="flex items-center gap-3">
               <button onclick="clearAllDataDatabase()" class="text-xs text-rose-400 hover:text-rose-300 font-bold flex items-center gap-1">
-                <i class="fa-solid fa-trash-can"></i> Clear All Data
+                <i class="fa-solid fa-trash-can"></i> Clear All
               </button>
               <button onclick="resetAdminFilters()" class="text-xs text-cyan-400 hover:text-cyan-300 font-semibold">Reset Filters</button>
             </div>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             
             <!-- Month Filter -->
             <div>
               <label class="block text-[11px] font-semibold text-slate-400 mb-1">Month Filter</label>
-              <input type="month" id="adminFilterMonth" onchange="renderAdminSnagsTable()" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500">
+              <input type="month" id="adminFilterMonth" onchange="renderAdminSnagsTable()" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500 cursor-pointer">
             </div>
 
             <!-- Category Filter -->
             <div>
               <label class="block text-[11px] font-semibold text-slate-400 mb-1">Category</label>
-              <select id="adminFilterCategory" onchange="renderAdminSnagsTable()" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500">
+              <select id="adminFilterCategory" onchange="renderAdminSnagsTable()" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500 cursor-pointer">
                 <option value="all">All Categories</option>
                 <option value="Electrical">⚡ Electrical</option>
                 <option value="Plumbing">🔧 Plumbing</option>
@@ -342,18 +385,18 @@
             <!-- Status Filter -->
             <div>
               <label class="block text-[11px] font-semibold text-slate-400 mb-1">Status</label>
-              <select id="adminFilterStatus" onchange="renderAdminSnagsTable()" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500">
+              <select id="adminFilterStatus" onchange="renderAdminSnagsTable()" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500 cursor-pointer">
                 <option value="all">All Statuses</option>
-                <option value="Open">Open</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Resolved">Resolved</option>
+                <option value="Open">🔴 Open</option>
+                <option value="In Progress">🟡 In Progress</option>
+                <option value="Resolved">🟢 Resolved</option>
               </select>
             </div>
 
             <!-- Floor Filter -->
             <div>
               <label class="block text-[11px] font-semibold text-slate-400 mb-1">Floor Level</label>
-              <select id="adminFilterFloor" onchange="renderAdminSnagsTable()" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500">
+              <select id="adminFilterFloor" onchange="renderAdminSnagsTable()" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500 cursor-pointer">
                 <option value="all">All Floor Levels</option>
                 <option value="1st">1st</option>
                 <option value="3rd">3rd</option>
@@ -366,13 +409,13 @@
           </div>
         </div>
 
-        <!-- Location & Building Options Manager (Admin Control) -->
+        <!-- Location & Building Options Manager -->
         <div class="glass-panel p-4 rounded-xl space-y-3 border border-slate-800">
           <div class="flex items-center justify-between">
             <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
               <i class="fa-solid fa-building-circle-gear text-amber-400"></i> Building Location & Floor Options Manager
             </h4>
-            <span class="text-[10px] text-cyan-400 font-mono">Changes sync live across all devices!</span>
+            <span class="text-[10px] text-cyan-400 font-mono hidden sm:inline">Changes sync live across all devices!</span>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -412,24 +455,24 @@
             <h4 class="text-sm font-bold text-white flex items-center gap-2">
               <i class="fa-solid fa-table-list text-cyan-400"></i> All Site Snag Observations
             </h4>
-            <span id="adminTableCount" class="text-xs text-slate-400">Showing 0 snags</span>
+            <span id="adminTableCount" class="text-xs text-slate-400 font-mono">Showing 0 snags</span>
           </div>
 
           <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-slate-300">
+            <table class="w-full text-left text-xs text-slate-300 whitespace-nowrap">
               <thead class="bg-slate-900/80 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
                 <tr>
                   <th class="px-3 py-3">Initial Photo & ID</th>
-                  <th class="px-3 py-3">Closure Evidence Photo</th>
+                  <th class="px-3 py-3">Closure Evidence</th>
                   <th class="px-3 py-3">Date & Time</th>
-                  <th class="px-3 py-3">Building / Floor / Location</th>
-                  <th class="px-3 py-3">Category</th>
-                  <th class="px-3 py-3">Assigned Team</th>
+                  <th class="px-3 py-3">Location & Floor</th>
+                  <th class="px-3 py-3">Raised by (Name)</th>
+                  <th class="px-3 py-3">Assigned to (Category & Person)</th>
                   <th class="px-3 py-3">Status</th>
                   <th class="px-3 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody id="adminSnagsTableBody" class="divide-y divide-slate-800/60">
+              <tbody id="adminSnagsTableBody" class="divide-y divide-slate-800/60 font-sans">
                 <!-- Table rows populated dynamically -->
               </tbody>
             </table>
@@ -443,12 +486,12 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           <!-- Create / Add User Form Card -->
-          <div class="glass-panel p-5 rounded-2xl space-y-4">
+          <div class="glass-panel p-4 sm:p-5 rounded-2xl space-y-4 border border-slate-800">
             <div class="flex items-center gap-2 border-b border-slate-700/60 pb-3">
               <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
                 <i class="fa-solid fa-user-plus"></i>
               </div>
-              <h3 class="font-bold text-white text-base">Add New User / Personnel</h3>
+              <h3 class="font-bold text-white text-base">Add New Personnel</h3>
             </div>
 
             <form id="addUserForm" onsubmit="handleCreateUser(event)" class="space-y-3.5">
@@ -499,23 +542,23 @@
                 <p class="text-[10px] text-slate-400 mt-1">User will log in using Mobile/Email + Password to access this category.</p>
               </div>
 
-              <button type="submit" class="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition">
-                <i class="fa-solid fa-plus-circle"></i> Create User & Set Login Credentials
+              <button type="submit" class="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition active:scale-95">
+                <i class="fa-solid fa-plus-circle"></i> Create User & Save Credentials
               </button>
             </form>
           </div>
 
           <!-- Existing Users List -->
-          <div class="glass-panel p-5 rounded-2xl space-y-4 lg:col-span-2">
+          <div class="glass-panel p-4 sm:p-5 rounded-2xl space-y-4 lg:col-span-2 border border-slate-800">
             <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
               <h3 class="font-bold text-white text-base flex items-center gap-2">
-                <i class="fa-solid fa-users text-cyan-400"></i> Active Registered System Users & Credentials
+                <i class="fa-solid fa-users text-cyan-400"></i> Registered Users & Category Access
               </h3>
-              <span id="userCountBadge" class="text-xs text-slate-400">0 Registered</span>
+              <span id="userCountBadge" class="text-xs text-slate-400 font-mono">0 Registered</span>
             </div>
 
             <div class="overflow-x-auto">
-              <table class="w-full text-left text-xs text-slate-300">
+              <table class="w-full text-left text-xs text-slate-300 whitespace-nowrap">
                 <thead class="bg-slate-900/80 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
                   <tr>
                     <th class="px-3 py-2.5">User & Mobile</th>
@@ -525,7 +568,7 @@
                     <th class="px-3 py-2.5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody id="usersTableBody" class="divide-y divide-slate-800/60">
+                <tbody id="usersTableBody" class="divide-y divide-slate-800/60 font-sans">
                   <!-- User rows inserted dynamically -->
                 </tbody>
               </table>
@@ -543,14 +586,14 @@
   <!-- ========================================================================= -->
   <!-- MODAL -1: USER LOGIN AUTHENTICATION MODAL (REQUIRED BEFORE APPLICATION)    -->
   <!-- ========================================================================= -->
-  <div id="userAuthModal" class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-    <div class="glass-panel bg-slate-900 border border-cyan-500/40 rounded-2xl w-full max-w-md p-6 space-y-5 shadow-2xl relative">
+  <div id="userAuthModal" class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="glass-panel bg-slate-900 border border-cyan-500/40 rounded-2xl w-full max-w-md p-5 sm:p-6 space-y-5 shadow-2xl relative">
       <div class="text-center space-y-2">
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white flex items-center justify-center mx-auto text-3xl shadow-lg shadow-cyan-500/30">
+        <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white flex items-center justify-center mx-auto text-2xl sm:text-3xl shadow-lg shadow-cyan-500/30">
           <i class="fa-solid fa-user-lock"></i>
         </div>
-        <h3 class="text-xl font-extrabold text-white">System Personnel Login</h3>
-        <p class="text-xs text-slate-400">Enter your Mobile Number (or Email) & Password to log in.</p>
+        <h3 class="text-lg sm:text-xl font-extrabold text-white">System Personnel Login</h3>
+        <p class="text-xs text-slate-400">Enter your Registered Mobile Number (or Email) & Password to log in.</p>
       </div>
 
       <form id="userLoginForm" onsubmit="handleUserLoginSubmit(event)" class="space-y-4">
@@ -558,7 +601,7 @@
           <label class="block text-xs font-semibold text-slate-300 mb-1">Mobile Number or Email *</label>
           <div class="relative">
             <i class="fa-solid fa-mobile-screen absolute left-3.5 top-3 text-slate-500 text-sm"></i>
-            <input type="text" id="userLoginIdInput" required placeholder="Mobile number or email..." class="w-full bg-slate-950 border border-slate-700 text-sm text-white rounded-xl pl-10 pr-3.5 py-2.5 focus:outline-none focus:border-cyan-500 font-mono">
+            <input type="text" id="userLoginIdInput" required placeholder="Enter mobile or email..." class="w-full bg-slate-950 border border-slate-700 text-sm text-white rounded-xl pl-10 pr-3.5 py-2.5 focus:outline-none focus:border-cyan-500 font-mono">
           </div>
         </div>
 
@@ -571,9 +614,9 @@
           <p id="userAuthError" class="text-xs text-rose-400 mt-1.5 hidden"><i class="fa-solid fa-circle-exclamation mr-1"></i> Invalid Mobile/Email or Password!</p>
         </div>
 
-        <div class="pt-2">
-          <button type="submit" class="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold text-sm shadow-lg shadow-cyan-500/25 transition">
-            Log In
+        <div class="pt-1">
+          <button type="submit" class="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold text-sm shadow-lg shadow-cyan-500/25 transition active:scale-95">
+            Log In & Access Snag System
           </button>
         </div>
       </form>
@@ -584,14 +627,14 @@
   <!-- ========================================================================= -->
   <!-- MODAL 0: ADMIN PASSWORD AUTHENTICATION MODAL                              -->
   <!-- ========================================================================= -->
-  <div id="adminAuthModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4">
-    <div class="glass-panel bg-slate-900 border border-amber-500/40 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl relative">
+  <div id="adminAuthModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="glass-panel bg-slate-900 border border-amber-500/40 rounded-2xl w-full max-w-md p-5 sm:p-6 space-y-4 shadow-2xl relative">
       <div class="text-center space-y-2">
-        <div class="w-14 h-14 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto text-2xl">
+        <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto text-xl sm:text-2xl">
           <i class="fa-solid fa-lock"></i>
         </div>
-        <h3 class="text-lg font-bold text-white">Admin Authentication Required</h3>
-        <p class="text-xs text-slate-400">Please enter the security password to access the Admin Panel.</p>
+        <h3 class="text-base sm:text-lg font-bold text-white">Admin Authentication Required</h3>
+        <p class="text-xs text-slate-400">Please enter the security password to unlock the Admin Panel.</p>
       </div>
 
       <form id="adminAuthForm" onsubmit="handleAdminLogin(event)" class="space-y-4">
@@ -602,8 +645,8 @@
         </div>
 
         <div class="flex items-center gap-3 pt-2">
-          <button type="button" onclick="cancelAdminAuth()" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs">Cancel</button>
-          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg">
+          <button type="button" onclick="cancelAdminAuth()" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition">Cancel</button>
+          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg transition active:scale-95">
             Unlock Admin Panel
           </button>
         </div>
@@ -615,21 +658,21 @@
   <!-- ========================================================================= -->
   <!-- MODAL 1: CAPTURE PHOTO & NEW SNAG OBSERVATION FORM                        -->
   <!-- ========================================================================= -->
-  <div id="captureModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-    <div class="glass-panel bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl md:max-w-4xl max-h-[95vh] overflow-y-auto shadow-2xl relative">
+  <div id="captureModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
+    <div class="glass-panel bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl lg:max-w-4xl max-h-[94vh] overflow-y-auto shadow-2xl relative">
       
       <!-- Modal Header -->
-      <div class="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-6 py-4 flex items-center justify-between z-20">
-        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+      <div class="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between z-20">
+        <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
           <i class="fa-solid fa-camera text-cyan-400"></i> Capture Snag Observation
         </h3>
-        <button onclick="closeCaptureModal()" class="text-slate-400 hover:text-white text-lg">
+        <button onclick="closeCaptureModal()" class="text-slate-400 hover:text-white text-lg p-1">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
       <!-- Modal Body -->
-      <form id="snagCaptureForm" onsubmit="handleSaveSnag(event)" class="p-4 sm:p-6 space-y-5">
+      <form id="snagCaptureForm" onsubmit="handleSaveSnag(event)" class="p-3.5 sm:p-6 space-y-4 sm:space-y-5">
         
         <!-- STEP 1: PHOTO CAPTURE & AUTOMATIC TIMESTAMP -->
         <div class="space-y-2">
@@ -639,14 +682,14 @@
           </label>
 
           <!-- Camera & Photo Container (Live Viewfinder & Instant Snap) -->
-          <div id="cameraBox" class="relative rounded-xl sm:rounded-2xl overflow-hidden bg-slate-950 border-2 border-cyan-500/40 min-h-[260px] max-h-[420px] h-[45vh] sm:min-h-[340px] sm:max-h-[460px] w-full flex items-center justify-center group shadow-2xl">
+          <div id="cameraBox" class="relative rounded-xl sm:rounded-2xl overflow-hidden bg-slate-950 border-2 border-cyan-500/40 min-h-[220px] max-h-[380px] h-[38vh] sm:min-h-[300px] sm:max-h-[440px] w-full flex items-center justify-center group shadow-2xl">
             
             <!-- Live Video Stream Element -->
             <video id="webcamVideo" autoplay playsinline muted class="w-full h-full object-cover rounded-xl sm:rounded-2xl hidden"></video>
             
             <!-- Camera Viewfinder Focus Reticle Overlay -->
             <div id="cameraViewfinderGrid" class="absolute inset-0 pointer-events-none hidden flex items-center justify-center">
-              <div class="w-48 h-48 border-2 border-cyan-400/40 rounded-2xl relative animate-pulse">
+              <div class="w-40 h-40 sm:w-48 sm:h-48 border-2 border-cyan-400/40 rounded-2xl relative animate-pulse">
                 <div class="absolute -top-1.5 -left-1.5 w-4 h-4 border-t-2 border-l-2 border-cyan-400"></div>
                 <div class="absolute -top-1.5 -right-1.5 w-4 h-4 border-t-2 border-r-2 border-cyan-400"></div>
                 <div class="absolute -bottom-1.5 -left-1.5 w-4 h-4 border-b-2 border-l-2 border-cyan-400"></div>
@@ -662,7 +705,7 @@
               </button>
 
               <!-- Big Shutter Snap Button -->
-              <button type="button" onclick="takeCameraSnap()" class="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white flex items-center justify-center text-2xl shadow-2xl shadow-cyan-500/50 border-4 border-white/80 active:scale-90 transition transform" title="Take Snap Photo">
+              <button type="button" onclick="takeCameraSnap()" class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white flex items-center justify-center text-xl sm:text-2xl shadow-2xl shadow-cyan-500/50 border-4 border-white/80 active:scale-90 transition transform" title="Take Snap Photo">
                 <i class="fa-solid fa-camera"></i>
               </button>
 
@@ -679,21 +722,27 @@
             <!-- Upload Placeholder Image Preview -->
             <img id="uploadImagePreview" class="w-full h-full object-contain rounded-xl sm:rounded-2xl hidden" alt="Uploaded snag preview">
 
-            <!-- Empty Camera Placeholder / Prompt (Fallback & Camera Launch Prompt) -->
-            <div id="cameraPlaceholder" class="p-4 sm:p-8 text-center space-y-3">
-              <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-800/90 text-cyan-400 flex items-center justify-center mx-auto text-2xl sm:text-3xl border border-cyan-500/40 shadow-xl">
+            <!-- Hidden direct native camera capture input -->
+            <input type="file" id="nativeCameraInput" accept="image/*" capture="environment" onchange="handleFileInput(event)" class="hidden">
+
+            <!-- Empty Camera Placeholder / Prompt -->
+            <div id="cameraPlaceholder" class="p-3 sm:p-6 text-center space-y-2.5 sm:space-y-3">
+              <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-slate-800/90 text-cyan-400 flex items-center justify-center mx-auto text-xl sm:text-2xl border border-cyan-500/40 shadow-xl">
                 <i class="fa-solid fa-camera"></i>
               </div>
               <div>
-                <p class="text-sm sm:text-base font-extrabold text-white">Live Camera Viewfinder</p>
-                <p class="text-[11px] sm:text-xs text-slate-400 max-w-md mx-auto">Open device camera to snap defect photo directly with live view, or upload an image file.</p>
+                <p class="text-sm sm:text-base font-extrabold text-white">Click Defect Photo with Camera</p>
+                <p class="text-[11px] sm:text-xs text-slate-400 max-w-md mx-auto">Tap "Open Camera" to take a photo directly or select an existing photo from gallery.</p>
               </div>
-              <div class="flex flex-wrap items-center justify-center gap-2 sm:gap-3 pt-1">
-                <button type="button" onclick="startWebcamStream()" class="px-5 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs sm:text-sm cursor-pointer shadow-lg shadow-cyan-500/25 flex items-center gap-2 active:scale-95 transition">
-                  <i class="fa-solid fa-video text-base sm:text-lg"></i> Open Live Camera
+              <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
+                <button type="button" onclick="triggerNativeCamera()" class="px-4 py-2.5 sm:px-5 sm:py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs sm:text-sm cursor-pointer shadow-lg shadow-cyan-500/25 flex items-center gap-2 active:scale-95 transition">
+                  <i class="fa-solid fa-camera text-base"></i> Open Camera
                 </button>
-                <label class="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm border border-slate-700 cursor-pointer flex items-center gap-2 active:scale-95 transition">
-                  <i class="fa-solid fa-image text-base sm:text-lg text-amber-400"></i> Choose File / Gallery
+                <button type="button" onclick="startWebcamStream()" class="px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold text-xs sm:text-sm border border-cyan-500/30 flex items-center gap-1.5 active:scale-95 transition">
+                  <i class="fa-solid fa-video text-base"></i> Live Stream
+                </button>
+                <label class="px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm border border-slate-700 cursor-pointer flex items-center gap-1.5 active:scale-95 transition">
+                  <i class="fa-solid fa-image text-base text-amber-400"></i> Gallery
                   <input type="file" accept="image/*" onchange="handleFileInput(event)" class="hidden">
                 </label>
               </div>
@@ -701,11 +750,11 @@
 
             <!-- Retake Photo Action (Visible when photo is snapped) -->
             <div id="retakeOverlay" class="absolute top-2 right-2 sm:top-3 sm:right-3 hidden z-20 flex items-center gap-2">
-              <button type="button" onclick="startWebcamStream()" class="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-cyan-600/90 hover:bg-cyan-500 text-white text-xs font-bold backdrop-blur flex items-center gap-1.5 border border-cyan-400/50 shadow-xl transition active:scale-95">
-                <i class="fa-solid fa-camera"></i> Live Camera Retake
+              <button type="button" onclick="triggerNativeCamera()" class="px-3 py-1.5 rounded-xl bg-cyan-600/90 hover:bg-cyan-500 text-white text-xs font-bold backdrop-blur flex items-center gap-1.5 border border-cyan-400/50 shadow-xl transition active:scale-95">
+                <i class="fa-solid fa-camera"></i> Retake
               </button>
-              <label class="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-xs font-bold backdrop-blur flex items-center gap-1.5 border border-slate-700 shadow-xl cursor-pointer transition active:scale-95">
-                <i class="fa-solid fa-folder-open text-amber-400"></i> Change File
+              <label class="px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-xs font-bold backdrop-blur flex items-center gap-1.5 border border-slate-700 shadow-xl cursor-pointer transition active:scale-95">
+                <i class="fa-solid fa-folder-open text-amber-400"></i> Change
                 <input type="file" accept="image/*" onchange="handleFileInput(event)" class="hidden">
               </label>
             </div>
@@ -719,7 +768,7 @@
           <!-- Building / Location -->
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1">Building Location *</label>
-            <select id="inputLocation" required onchange="handleBuildingLocationChange(this.value)" oninput="handleBuildingLocationChange(this.value)" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500 font-semibold cursor-pointer">
+            <select id="inputLocation" required onchange="handleBuildingLocationChange(this.value)" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500 font-semibold cursor-pointer">
               <option value="NAB-DT3" selected>NAB-DT3</option>
               <option value="NAB-DT4">NAB-DT4</option>
             </select>
@@ -735,8 +784,8 @@
 
           <!-- Location (Free text) -->
           <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">Location *</label>
-            <input type="text" id="inputArea" required placeholder="Enter location (e.g. Room 204, AHU Room, Hallway)..." class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500">
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Location Details / Area *</label>
+            <input type="text" id="inputArea" required placeholder="e.g. Room 204, Server Room, AHU Room..." class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500">
           </div>
 
           <!-- Category Selection -->
@@ -749,7 +798,6 @@
               <option value="Painting">🎨 Painting</option>
               <option value="General">📦 General</option>
             </select>
-            <p class="text-[10px] text-cyan-400/80 mt-1">Snag assignment triggers live vibration & ring chime!</p>
           </div>
 
           <!-- Assigned Specialist / Technician -->
@@ -772,12 +820,12 @@
           </div>
 
           <!-- Status -->
-          <div>
+          <div class="sm:col-span-2">
             <label class="block text-xs font-semibold text-slate-300 mb-1">Initial Status</label>
             <select id="inputStatus" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500">
-              <option value="Open">Open (Pending Resolution)</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Resolved">Resolved</option>
+              <option value="Open">🔴 Open (Pending Resolution)</option>
+              <option value="In Progress">🟡 In Progress</option>
+              <option value="Resolved">🟢 Resolved</option>
             </select>
           </div>
 
@@ -786,13 +834,13 @@
         <!-- Description / Remarks -->
         <div>
           <label class="block text-xs font-semibold text-slate-300 mb-1">Observation Remarks / Description *</label>
-          <textarea id="inputDescription" rows="3" required placeholder="Describe the defect, defect root cause, or required corrective action..." class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl p-3 focus:outline-none focus:border-cyan-500"></textarea>
+          <textarea id="inputDescription" rows="3" required placeholder="Describe the defect, root cause, or required corrective action..." class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl p-3 focus:outline-none focus:border-cyan-500"></textarea>
         </div>
 
         <!-- Submit Button -->
-        <div class="flex items-center justify-end gap-3 border-t border-slate-800 pt-4">
-          <button type="button" onclick="closeCaptureModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs">Cancel</button>
-          <button type="submit" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20">
+        <div class="flex items-center justify-end gap-3 border-t border-slate-800 pt-3.5">
+          <button type="button" onclick="closeCaptureModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition">Cancel</button>
+          <button type="submit" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 active:scale-95 transition">
             Submit Snag Observation
           </button>
         </div>
@@ -805,21 +853,21 @@
   <!-- ========================================================================= -->
   <!-- MODAL 2: SNAG DETAIL VIEW & STATUS UPDATE                                 -->
   <!-- ========================================================================= -->
-  <div id="detailModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4 overflow-y-auto">
-    <div class="glass-panel bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl max-h-[92vh] overflow-y-auto shadow-2xl relative">
+  <div id="detailModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
+    <div class="glass-panel bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl lg:max-w-4xl max-h-[94vh] overflow-y-auto shadow-2xl relative">
       
       <!-- Modal Header -->
-      <div class="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-6 py-4 flex items-center justify-between z-20">
-        <div class="flex items-center gap-3">
+      <div class="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between z-20">
+        <div class="flex items-center gap-2.5 sm:gap-3">
           <span id="detailCategoryBadge" class="badge-electrical px-2.5 py-1 rounded-full text-xs font-bold">⚡ Electrical</span>
-          <h3 id="detailSnagId" class="text-base font-extrabold text-white font-mono">SNAG-2026-001</h3>
+          <h3 id="detailSnagId" class="text-sm sm:text-base font-extrabold text-white font-mono">SNAG-2026-001</h3>
         </div>
-        <button onclick="closeDetailModal()" class="text-slate-400 hover:text-white text-lg">
+        <button onclick="closeDetailModal()" class="text-slate-400 hover:text-white text-lg p-1">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <div class="p-6 space-y-6">
+      <div class="p-4 sm:p-6 space-y-5 sm:space-y-6">
         
         <!-- Image & Stamp Display (Before & After Closure Photo) -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -829,7 +877,7 @@
               <span class="flex items-center gap-1.5 text-rose-400"><i class="fa-solid fa-triangle-exclamation"></i> Initial Defect Photo</span>
               <span id="detailDate" class="text-[10px] font-mono text-cyan-300">Date</span>
             </div>
-            <div class="relative rounded-xl overflow-hidden bg-black border border-slate-800 h-56 flex flex-col justify-between">
+            <div class="relative rounded-xl overflow-hidden bg-black border border-slate-800 h-52 sm:h-56 flex flex-col justify-between">
               <img id="detailImage" class="w-full h-full object-contain mx-auto" alt="Snag Detail Image">
               <div class="p-2 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between text-[10px] font-mono text-cyan-300">
                 <span><i class="fa-solid fa-location-dot mr-1 text-rose-400"></i><span id="detailGps">Site GPS</span></span>
@@ -843,29 +891,37 @@
               <span class="flex items-center gap-1.5 text-emerald-400"><i class="fa-solid fa-circle-check"></i> Closure Photo (Resolved Evidence)</span>
               <span id="detailClosureDate" class="text-[10px] font-mono text-emerald-400">Not Uploaded</span>
             </div>
-            <div id="detailClosurePhotoContainer" class="relative rounded-xl overflow-hidden bg-slate-950 border border-dashed border-slate-700 h-56 flex flex-col items-center justify-center text-center p-3">
+            <div id="detailClosurePhotoContainer" class="relative rounded-xl overflow-hidden bg-slate-950 border border-dashed border-slate-700 h-52 sm:h-56 flex flex-col items-center justify-center text-center p-3">
               <!-- Populated dynamically via JS -->
             </div>
           </div>
         </div>
 
         <!-- Snag Info Grid -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-950/40 p-4 rounded-xl border border-slate-800">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 bg-slate-950/40 p-3.5 sm:p-4 rounded-xl border border-slate-800 text-xs">
           <div>
             <span class="text-[10px] uppercase font-bold text-slate-400 block">Building</span>
-            <span id="detailLocation" class="text-xs font-semibold text-white">NAB-DT3</span>
+            <span id="detailLocation" class="font-semibold text-white">NAB-DT3</span>
           </div>
           <div>
             <span class="text-[10px] uppercase font-bold text-slate-400 block">Floor</span>
-            <span id="detailFloor" class="text-xs font-semibold text-white">3rd Floor</span>
+            <span id="detailFloor" class="font-semibold text-white">3rd Floor</span>
           </div>
           <div>
             <span class="text-[10px] uppercase font-bold text-slate-400 block">Location</span>
-            <span id="detailArea" class="text-xs font-semibold text-white">Room 204</span>
+            <span id="detailArea" class="font-semibold text-white">Room 204</span>
           </div>
           <div>
             <span class="text-[10px] uppercase font-bold text-slate-400 block">Priority</span>
-            <span id="detailPriority" class="text-xs font-bold text-rose-400">High</span>
+            <span id="detailPriority" class="font-bold text-rose-400">High</span>
+          </div>
+          <div>
+            <span class="text-[10px] uppercase font-bold text-cyan-400 block"><i class="fa-solid fa-user-pen mr-1"></i>Raised by (Name)</span>
+            <span id="detailRaisedBy" class="font-bold text-cyan-300 truncate block">Inspector</span>
+          </div>
+          <div>
+            <span class="text-[10px] uppercase font-bold text-amber-400 block"><i class="fa-solid fa-layer-group mr-1"></i>Assigned to (Category)</span>
+            <span id="detailAssignedToCategory" class="font-bold text-amber-300 truncate block">Category</span>
           </div>
         </div>
 
@@ -877,17 +933,17 @@
           </p>
         </div>
 
-        <!-- Update Status & Assigned Technician Controls (MST Work Remarks & Status) -->
+        <!-- Update Status & Assigned Technician Controls -->
         <div class="glass-panel p-4 rounded-xl space-y-4 border border-cyan-500/30">
           <h4 class="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center justify-between">
-            <span class="flex items-center gap-1.5"><i class="fa-solid fa-pen-to-square"></i> MST Technician Action & Remark Update</span>
-            <span class="text-[10px] text-slate-400 font-mono">Updates sync live to team</span>
+            <span class="flex items-center gap-1.5"><i class="fa-solid fa-pen-to-square"></i> Technician Action & Remark Update</span>
+            <span class="text-[10px] text-slate-400 font-mono hidden sm:inline">Updates sync live to team</span>
           </h4>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label class="block text-[11px] font-semibold text-slate-300 mb-1">Status Progress *</label>
-              <select id="detailStatusSelect" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500 font-semibold">
+              <select id="detailStatusSelect" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500 font-semibold cursor-pointer">
                 <option value="Open">🔴 Open (Pending Action)</option>
                 <option value="In Progress">🟡 In Progress (Technician Working)</option>
                 <option value="Resolved">🟢 Resolved & Compliant</option>
@@ -902,31 +958,31 @@
           </div>
 
           <div>
-            <label class="block text-[11px] font-semibold text-slate-300 mb-1">MST Technician Work Remark / Resolution Comment *</label>
+            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Technician Work Remark / Resolution Comment *</label>
             <textarea id="detailTechnicianRemark" rows="2" placeholder="Enter work progress details, root cause, or resolution remark (e.g. Replaced faulty MCB switch, tested load)..." class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl p-3 focus:outline-none focus:border-cyan-500 font-sans"></textarea>
           </div>
 
           <!-- Closure Photo Upload Section for assigned user -->
           <div class="border-t border-slate-800/80 pt-3 space-y-2">
             <label class="block text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
-              <span class="text-emerald-400 flex items-center gap-1.5"><i class="fa-solid fa-camera"></i> Upload Closure Photo (Defect Resolution Evidence)</span>
-              <span id="closureStatusTag" class="text-[10px] font-mono text-slate-400">Upload proof of fix to resolve</span>
+              <span class="text-emerald-400 flex items-center gap-1.5"><i class="fa-solid fa-camera"></i> Upload Closure Photo (Resolved Proof)</span>
+              <span id="closureStatusTag" class="text-[10px] font-mono text-slate-400">Proof of fix</span>
             </label>
 
             <div id="closureUploadBox" class="bg-slate-950/80 p-3 rounded-xl border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
               <div class="flex items-center gap-3 w-full sm:w-auto">
-                <div id="closurePreviewThumb" class="w-14 h-14 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0">
+                <div id="closurePreviewThumb" class="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0">
                   <i class="fa-solid fa-image text-slate-600 text-xl"></i>
                 </div>
                 <div class="text-xs">
                   <span id="closurePhotoTitle" class="font-bold text-white block">No Closure Photo Attached</span>
-                  <span id="closurePhotoSub" class="text-[11px] text-slate-400 block">Upload photo showing fixed/closed snag observation</span>
+                  <span id="closurePhotoSub" class="text-[11px] text-slate-400 block">Upload photo showing fixed defect</span>
                 </div>
               </div>
 
               <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
                 <button type="button" onclick="triggerClosureFileSelect()" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs cursor-pointer shadow flex items-center gap-1.5 transition shrink-0 active:scale-95">
-                  <i class="fa-solid fa-upload"></i> <span id="closureBtnText">Upload Closure Photo</span>
+                  <i class="fa-solid fa-upload"></i> <span id="closureBtnText">Upload Proof</span>
                 </button>
                 <input type="file" id="closureFileInput" accept="image/*" capture="environment" onchange="handleClosureFileInput(event)" class="hidden">
                 <button type="button" id="btnRemoveClosurePhoto" onclick="removeClosurePhoto()" class="hidden px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-rose-400 font-bold text-xs border border-rose-500/30 transition" title="Remove Closure Photo">
@@ -938,7 +994,7 @@
 
           <!-- Remarks History Timeline Log -->
           <div id="detailRemarksHistoryContainer" class="hidden space-y-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block"><i class="fa-solid fa-clock-rotate-left mr-1 text-cyan-400"></i> Technician Remarks History Log</span>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block"><i class="fa-solid fa-clock-rotate-left mr-1 text-cyan-400"></i> Remarks History Log</span>
             <div id="detailRemarksHistoryList" class="space-y-2 text-xs font-mono max-h-36 overflow-y-auto pr-1">
               <!-- History items populated dynamically -->
             </div>
@@ -946,7 +1002,7 @@
 
           <div class="flex justify-end pt-1">
             <button type="button" onclick="saveDetailStatusUpdate()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 flex items-center gap-2 transition active:scale-95">
-              <i class="fa-solid fa-floppy-disk"></i> Save Status & Work Remark
+              <i class="fa-solid fa-floppy-disk"></i> Save Status & Remark
             </button>
           </div>
         </div>
@@ -960,12 +1016,12 @@
   <!-- MODAL: EDIT USER DETAILS & CATEGORY MODAL                                 -->
   <!-- ========================================================================= -->
   <div id="editUserModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-    <div class="glass-panel bg-slate-900 border border-amber-500/40 rounded-2xl w-[92vw] sm:w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6 space-y-4 shadow-2xl relative">
+    <div class="glass-panel bg-slate-900 border border-amber-500/40 rounded-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto p-4 sm:p-6 space-y-4 shadow-2xl relative">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h3 class="text-base font-bold text-white flex items-center gap-2">
           <i class="fa-solid fa-user-pen text-amber-400"></i> Edit Personnel Details & Category
         </h3>
-        <button type="button" onclick="closeEditUserModal()" class="text-slate-400 hover:text-white text-lg">
+        <button type="button" onclick="closeEditUserModal()" class="text-slate-400 hover:text-white text-lg p-1">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
@@ -1024,8 +1080,8 @@
         </div>
 
         <div class="flex items-center gap-3 pt-2">
-          <button type="button" onclick="closeEditUserModal()" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs">Cancel</button>
-          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg">
+          <button type="button" onclick="closeEditUserModal()" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition">Cancel</button>
+          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg active:scale-95 transition">
             Save Changes
           </button>
         </div>
@@ -1038,17 +1094,17 @@
   <!-- MODAL 3: USER PROFILE VIEW MODAL                                          -->
   <!-- ========================================================================= -->
   <div id="userProfileModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-    <div class="glass-panel bg-slate-900 border border-cyan-500/40 rounded-2xl w-[92vw] sm:w-full max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6 space-y-5 shadow-2xl relative">
+    <div class="glass-panel bg-slate-900 border border-cyan-500/40 rounded-2xl w-full max-w-md max-h-[92vh] overflow-y-auto p-4 sm:p-6 space-y-5 shadow-2xl relative">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h3 class="text-base font-extrabold text-white flex items-center gap-2">
           <i class="fa-solid fa-id-badge text-cyan-400"></i> User Account Profile
         </h3>
-        <button onclick="closeUserProfileModal()" class="text-slate-400 hover:text-white text-lg">
+        <button onclick="closeUserProfileModal()" class="text-slate-400 hover:text-white text-lg p-1">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <div class="text-center space-y-3">
+      <div class="text-center space-y-2.5">
         <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white flex items-center justify-center mx-auto text-3xl sm:text-4xl shadow-xl shadow-cyan-500/20">
           <i class="fa-solid fa-user-check"></i>
         </div>
@@ -1058,7 +1114,7 @@
         </div>
       </div>
 
-      <div class="space-y-3 bg-slate-950/60 p-3.5 sm:p-4 rounded-xl border border-slate-800 text-xs font-mono">
+      <div class="space-y-2.5 bg-slate-950/60 p-3.5 sm:p-4 rounded-xl border border-slate-800 text-xs font-mono">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-2 gap-1">
           <span class="text-slate-400 shrink-0"><i class="fa-solid fa-phone mr-1.5 text-cyan-400"></i>Mobile Number</span>
           <span id="profileMobile" class="text-white font-bold break-all">--</span>
@@ -1077,12 +1133,12 @@
         </div>
       </div>
 
-      <div class="flex items-center gap-3 pt-2">
-        <button onclick="closeUserProfileModal(); openEditUserModal(STATE.currentUser?.id);" class="flex-1 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs flex items-center justify-center gap-1.5 transition">
-          <i class="fa-solid fa-pen-to-square"></i> Edit Category & Info
+      <div class="flex items-center gap-3 pt-1">
+        <button onclick="closeUserProfileModal(); openEditUserModal(STATE.currentUser?.id);" class="flex-1 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95">
+          <i class="fa-solid fa-pen-to-square"></i> Edit Info
         </button>
         <button onclick="closeUserProfileModal()" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition">
-          Close Profile
+          Close
         </button>
       </div>
     </div>
@@ -1093,23 +1149,23 @@
   <!-- MODAL 4: FULL-SCREEN PHOTO LIGHTBOX / ENLARGED VIEW MODAL                 -->
   <!-- ========================================================================= -->
   <div id="photoLightboxModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-    <div class="glass-panel bg-slate-950/95 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden p-4 space-y-3 shadow-2xl relative flex flex-col justify-between">
+    <div class="glass-panel bg-slate-950/95 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden p-3.5 sm:p-4 space-y-3 shadow-2xl relative flex flex-col justify-between">
       <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
         <h4 id="lightboxTitle" class="text-sm font-extrabold text-white flex items-center gap-2">
           <i class="fa-solid fa-expand text-cyan-400"></i> Photo Evidence View
         </h4>
-        <button type="button" onclick="closePhotoLightbox()" class="text-slate-400 hover:text-white text-xl">
+        <button type="button" onclick="closePhotoLightbox()" class="text-slate-400 hover:text-white text-xl p-1">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <div class="relative flex-1 min-h-[50vh] max-h-[75vh] flex items-center justify-center bg-black rounded-xl overflow-hidden p-2">
+      <div class="relative flex-1 min-h-[45vh] max-h-[75vh] flex items-center justify-center bg-black rounded-xl overflow-hidden p-2">
         <img id="lightboxImage" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt="Enlarged Photo View">
       </div>
 
       <div class="flex justify-end pt-1">
-        <button type="button" onclick="closePhotoLightbox()" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs">
-          Close Photo View
+        <button type="button" onclick="closePhotoLightbox()" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition">
+          Close View
         </button>
       </div>
     </div>

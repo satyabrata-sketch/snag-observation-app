@@ -22,6 +22,7 @@ let knownSnagAssignments = new Map();
 const STATE = {
   activeSection: 'user', // 'user' or 'admin'
   activeAdminTab: 'tracking', // 'tracking' or 'users'
+  activeUserFeedTab: 'assigned', // 'assigned', 'all', or 'raised'
   currentUser: null, // Logged in user object
   isAdminAuthenticated: false,
   mediaStream: null,
@@ -215,11 +216,44 @@ function requestNotificationPermission() {
 }
 
 /**
+ * Helper to synchronize active logged-in user profile with Native Android APK background service
+ */
+function syncNativeUserToAndroid(user) {
+  try {
+    if (!user) {
+      if (window.AndroidBridge && typeof window.AndroidBridge.clearCurrentUser === 'function') {
+        window.AndroidBridge.clearCurrentUser();
+      }
+      return;
+    }
+    if (window.AndroidBridge && typeof window.AndroidBridge.setCurrentUser === 'function') {
+      window.AndroidBridge.setCurrentUser(
+        user.name || '',
+        user.role || '',
+        user.category || '',
+        user.mobile || '',
+        user.email || ''
+      );
+      console.log('📱 Synced active user profile with Android Native Background Service:', user.name, user.role);
+    }
+  } catch (e) {
+    console.warn('Native user sync error:', e);
+  }
+}
+
+/**
  * Triggers physical device vibration
  * Supports: Native Android APK Bridge, Web Vibration API
+ * Note: Suppressed if current user is Admin
  */
 function vibrateDevice(pattern = [0, 400, 200, 400, 200, 800]) {
   try {
+    const curUser = STATE.currentUser;
+    if (curUser && (curUser.role === 'Admin' || curUser.name === 'Admin')) {
+      // Admin is not vibrated
+      return;
+    }
+
     // 1. Android Native APK Bridge
     if (window.AndroidBridge && typeof window.AndroidBridge.vibratePattern === 'function') {
       const csv = Array.isArray(pattern) ? pattern.join(',') : '0,400,200,400,200,800';
@@ -241,8 +275,15 @@ function vibrateDevice(pattern = [0, 400, 200, 400, 200, 800]) {
 /**
  * Plays high-priority loud melodic notification ringtone chime
  * Supports: Native Android RingtoneManager in APK + Web Audio API synthesizer
+ * Note: Suppressed if current user is Admin
  */
 function playSnagRingSound() {
+  const curUser = STATE.currentUser;
+  if (curUser && (curUser.role === 'Admin' || curUser.name === 'Admin')) {
+    // Admin is not alerted with ringtone
+    return;
+  }
+
   try {
     // 1. Android Native APK Ringtone / Sound (Plays system notification / ringtone sound)
     if (window.AndroidBridge && typeof window.AndroidBridge.playRingSound === 'function') {
@@ -299,37 +340,57 @@ function playSnagRingSound() {
 
 /**
  * Core Snag Assignment Notification Dispatcher
- * Triggered whenever a snag is assigned or reassigned
+ * Triggered whenever a snag is assigned or reassigned.
+ * IMPORTANT:
+ * - Admin is NEVER notified of snag assignments (dmin will not be notified).
+ * - Respective assigned technician receives vibration, sound, status bar notification, and in-app banner.
  */
 function triggerSnagAssignmentNotification(snag, context = 'assigned') {
   if (!snag) return;
 
   const curUser = STATE.currentUser;
-  const curUserName = (curUser?.name || '').trim().toLowerCase();
-  const curUserRole = (curUser?.role || '').trim().toLowerCase();
-  const curUserCat = (curUser?.category || '').trim().toLowerCase();
+  if (!curUser) return;
+
+  const curUserName = (curUser.name || '').trim().toLowerCase();
+  const curUserRole = (curUser.role || '').trim().toLowerCase();
+  const curUserCat = (curUser.category || '').trim().toLowerCase();
+  const curUserMobile = (curUser.mobile || '').trim();
+
+  // 1. ADMIN CHECK: Admin will strictly NOT be notified or vibrated
+  if (curUserRole === 'admin' || curUserName === 'admin') {
+    console.log('🔇 Admin logged in -> Snag assignment alert suppressed (Admin will not be notified)');
+    return;
+  }
 
   const assignedTo = (snag.assignedUser || '').trim();
   const assignedToLower = assignedTo.toLowerCase();
   const snagCatLower = (snag.category || '').trim().toLowerCase();
 
-  // Check if current user should receive the alert:
-  // - Current user is explicitly named in assignment
-  // - Current user is MST / Supervisor / Admin / BMS Operator
-  // - Current user belongs to matching category
-  // - Or user just created / reassigned the snag and gets feedback confirmation
-  const isDirectAssignee = curUserName && assignedToLower.includes(curUserName);
-  const isTeamMatch = curUserCat.includes(snagCatLower) || snagCatLower.includes(curUserCat);
-  const isPrivilegedRole = !curUser || ['mst', 'engineer', 'supervisor', 'admin', 'bms operator'].includes(curUserRole);
+  // 2. Respective user match check:
+  // - Current user is explicitly named in assignment (e.g., "Vikash" in "Vikash (MST - Electrical)")
+  // - Current user's 10-digit mobile number matches
+  // - Team assignment matches technician role ("All MST Team", "BMS Operator Team", etc.)
+  // - Category specialist team matches
+  const isDirectAssignee = curUserName && (assignedToLower.includes(curUserName) || (curUser.id && assignedToLower.includes(curUser.id.toLowerCase())));
+  const isMobileMatch = curUserMobile && curUserMobile.length >= 7 && assignedToLower.includes(curUserMobile);
+  
+  const isTeamAssignee = 
+    (assignedToLower.includes('all mst team') && curUserRole.includes('mst')) ||
+    (assignedToLower.includes('bms operator team') && curUserRole.includes('bms')) ||
+    (assignedToLower.includes('plumber') && (curUserRole.includes('plumb') || curUserCat.includes('plumb'))) ||
+    (assignedToLower.includes('painter') && (curUserRole.includes('paint') || curUserCat.includes('paint')));
 
-  const shouldNotify = isDirectAssignee || isTeamMatch || isPrivilegedRole;
+  const isMatchingCategoryTeam = assignedToLower.startsWith('mst specialist team') && 
+    (curUserCat.includes(snagCatLower) || snagCatLower.includes(curUserCat) || curUserRole.includes('mst'));
 
-  if (!shouldNotify && context !== 'test') {
-    console.log('Notification skipped for non-matching user:', curUser?.name);
+  const shouldNotify = isDirectAssignee || isMobileMatch || isTeamAssignee || isMatchingCategoryTeam || context === 'test';
+
+  if (!shouldNotify) {
+    console.log('Notification skipped for non-matching user:', curUser?.name, 'Assigned to:', assignedTo);
     return;
   }
 
-  const title = `⚡ Snag ${snag.id} Assigned to ${assignedTo || 'Technician'}!`;
+  const title = `⚡ Snag ${snag.id} Assigned to You!`;
   const bodyText = `Category: ${snag.category} | Priority: ${snag.priority}\nLocation: ${snag.location} - ${snag.floor} (${snag.area})\nRemarks: ${snag.description || 'Action required'}`;
 
   // 1. Double-Pulse Device Vibration (Inside APK and Web)
@@ -341,7 +402,7 @@ function triggerSnagAssignmentNotification(snag, context = 'assigned') {
   // 3. Native Android Status Bar Notification / Web Push Notification
   try {
     if (window.AndroidBridge && typeof window.AndroidBridge.notifySnagAssigned === 'function') {
-      window.AndroidBridge.notifySnagAssigned(title, bodyText, snag.id);
+      window.AndroidBridge.notifySnagAssigned(title, bodyText, snag.id, assignedTo);
     } else if ('Notification' in window && Notification.permission === 'granted') {
       const notif = new Notification(title, {
         body: bodyText,
@@ -362,8 +423,8 @@ function triggerSnagAssignmentNotification(snag, context = 'assigned') {
 
   // 4. Floating Visual Toast Banner
   showInAppToastBanner(
-    `⚡ ${snag.category} Snag Assigned: ${snag.id}`,
-    `Assigned to: ${assignedTo || 'Specialist'} • ${snag.location} (${snag.floor}) • ${snag.priority} Priority`,
+    `⚡ Snag Assigned to You: ${snag.id}`,
+    `Location: ${snag.location} (${snag.floor} - ${snag.area}) • ${snag.category} • ${snag.priority} Priority`,
     snag.id
   );
 }
@@ -373,15 +434,20 @@ function triggerSnagAssignmentNotification(snag, context = 'assigned') {
  */
 function testNotificationAlert() {
   requestNotificationPermission();
+  const curUser = STATE.currentUser;
+  if (!curUser || curUser.role === 'Admin' || curUser.name === 'Admin') {
+    alert('⚠️ Current active user is Admin.\n\nPer system requirements, Admin does NOT receive snag vibration or assignment alerts.\n\nTo test vibration & assignment ringtone, please switch to or login as a technician (e.g. Vikash, Sanjay, Raju, etc.).');
+    return;
+  }
   const testSnag = {
     id: `TEST-${Math.floor(1000 + Math.random() * 9000)}`,
-    category: 'Electrical',
+    category: curUser.category?.split(',')[0]?.trim() || 'Electrical',
     priority: 'High',
     location: 'NAB-DT3',
     floor: '3rd',
     area: 'Server Room',
-    description: 'Test vibration and ring sound alert verification',
-    assignedUser: STATE.currentUser?.name ? `${STATE.currentUser.name} (${STATE.currentUser.role})` : 'Vikash (MST - Electrical)'
+    description: 'Test vibration and ring sound alert verification for assigned technician',
+    assignedUser: `${curUser.name} (${curUser.role}${curUser.category ? ' - ' + curUser.category : ''})`
   };
   triggerSnagAssignmentNotification(testSnag, 'test');
 }
@@ -575,6 +641,7 @@ function initLocalStorage() {
           STATE.isAdminAuthenticated = true;
         }
         localStorage.setItem('snag_tracker_active_user', JSON.stringify(STATE.currentUser));
+        syncNativeUserToAndroid(STATE.currentUser);
       }
     } catch (e) {}
   }
@@ -632,6 +699,7 @@ function handleUserLoginSubmit(e) {
   if (matchedUser) {
     STATE.currentUser = matchedUser;
     localStorage.setItem('snag_tracker_active_user', JSON.stringify(matchedUser));
+    syncNativeUserToAndroid(matchedUser);
     document.getElementById('userAuthError').classList.add('hidden');
     closeUserAuthModal();
     
@@ -805,6 +873,7 @@ function handleUserLogout() {
   STATE.currentUser = null;
   STATE.isAdminAuthenticated = false;
   localStorage.removeItem('snag_tracker_active_user');
+  syncNativeUserToAndroid(null);
   openUserAuthModal();
 }
 
@@ -964,6 +1033,7 @@ function handleAdminLogin(e) {
       STATE.currentUser = SYSTEM_USERS.find(u => u.role === 'Admin') || { name: 'Admin', role: 'Admin', category: 'General' };
       localStorage.setItem('snag_tracker_active_user', JSON.stringify(STATE.currentUser));
     }
+    syncNativeUserToAndroid(STATE.currentUser);
     document.getElementById('adminAuthModal').classList.add('hidden');
     switchSection('admin');
     renderApp();
@@ -1005,57 +1075,124 @@ function switchAdminTab(tab) {
 // USER SECTION LOGIC & CARD RENDERING
 // ==========================================================================
 
+function switchUserFeedTab(tab) {
+  STATE.activeUserFeedTab = tab || 'assigned';
+  ['assigned', 'all', 'raised'].forEach(t => {
+    const btn = document.getElementById(`userTab${t.charAt(0).toUpperCase() + t.slice(1)}`);
+    if (btn) {
+      if (t === STATE.activeUserFeedTab) {
+        btn.className = 'tab-btn active flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 border border-cyan-500/30';
+      } else {
+        btn.className = 'tab-btn flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 text-slate-400 hover:text-white';
+      }
+    }
+  });
+
+  const headerTitle = document.getElementById('userFeedHeaderTitle');
+  if (headerTitle) {
+    if (STATE.activeUserFeedTab === 'assigned') headerTitle.textContent = '⚡ Assigned to Me:';
+    else if (STATE.activeUserFeedTab === 'all') headerTitle.textContent = '🌐 All Site Snags:';
+    else if (STATE.activeUserFeedTab === 'raised') headerTitle.textContent = '🙋‍♂️ Raised by Me:';
+  }
+
+  renderUserSnagsFeed();
+}
+
 function renderUserSnagsFeed() {
   const grid = document.getElementById('userSnagsGrid');
   if (!grid || !STATE.currentUser) return;
 
   const curUser = STATE.currentUser;
-  const filterScope = document.getElementById('userFilterScope')?.value || 'all';
-  const filterStatus = document.getElementById('userFilterStatus')?.value || 'all';
+  const activeTab = STATE.activeUserFeedTab || 'assigned';
+  const categoryFilter = document.getElementById('userFilterCategory')?.value || 'all';
+  const statusFilter = document.getElementById('userFilterStatus')?.value || 'all';
   const searchQuery = document.getElementById('userSearchInput')?.value?.toLowerCase() || '';
 
   const userNameLower = (curUser.name || '').trim().toLowerCase();
+  const userMobile = (curUser.mobile || '').trim();
+  const userRoleLower = (curUser.role || '').trim().toLowerCase();
   const userCats = (curUser.category || '').split(',').map(c => c.trim().toLowerCase());
 
+  // Calculate Tab Badge Counts across all site snags
+  let countAssigned = 0;
+  let countAll = snagsStore.length;
+  let countRaised = 0;
+
+  snagsStore.forEach(snag => {
+    const assignedUserLower = (snag.assignedUser || '').trim().toLowerCase();
+    const createdByLower = (snag.createdBy || '').trim().toLowerCase();
+    const snagCatLower = (snag.category || '').trim().toLowerCase();
+
+    // Check if snag is assigned directly to current user or matching specialist team
+    const isDirect = userNameLower && (assignedUserLower.includes(userNameLower) || userNameLower.includes(assignedUserLower));
+    const isMobile = userMobile && userMobile.length >= 7 && assignedUserLower.includes(userMobile);
+    const isTeamRole = (assignedUserLower.includes('all mst team') && userRoleLower.includes('mst')) ||
+                       (assignedUserLower.includes('bms operator team') && userRoleLower.includes('bms')) ||
+                       (assignedUserLower.includes('plumber') && (userRoleLower.includes('plumb') || userCats.includes('plumbing'))) ||
+                       (assignedUserLower.includes('painter') && (userRoleLower.includes('paint') || userCats.includes('painting')));
+    const isCatTeam = assignedUserLower.startsWith('mst specialist team') && (userCats.includes(snagCatLower) || userRoleLower.includes('mst'));
+
+    if (isDirect || isMobile || isTeamRole || isCatTeam || curUser.role === 'Admin') {
+      countAssigned++;
+    }
+
+    if (createdByLower === userNameLower) {
+      countRaised++;
+    }
+  });
+
+  const tabCountAssignedEl = document.getElementById('tabCountAssigned');
+  const tabCountAllEl = document.getElementById('tabCountAll');
+  const tabCountRaisedEl = document.getElementById('tabCountRaised');
+
+  if (tabCountAssignedEl) tabCountAssignedEl.textContent = countAssigned;
+  if (tabCountAllEl) tabCountAllEl.textContent = countAll;
+  if (tabCountRaisedEl) tabCountRaisedEl.textContent = countRaised;
+
+  // Filter snags according to active tab scope, category, status, and search query
   let filtered = snagsStore.filter(snag => {
     const createdByLower = (snag.createdBy || '').trim().toLowerCase();
     const assignedUserLower = (snag.assignedUser || '').trim().toLowerCase();
     const snagCatLower = (snag.category || '').trim().toLowerCase();
 
-    // Check if raised by logged-in user
-    const isRaisedByMe = createdByLower === userNameLower || assignedUserLower.includes(userNameLower);
+    // 1. Tab Scope Filter
+    if (activeTab === 'assigned') {
+      const isDirect = userNameLower && (assignedUserLower.includes(userNameLower) || userNameLower.includes(assignedUserLower));
+      const isMobile = userMobile && userMobile.length >= 7 && assignedUserLower.includes(userMobile);
+      const isTeamRole = (assignedUserLower.includes('all mst team') && userRoleLower.includes('mst')) ||
+                         (assignedUserLower.includes('bms operator team') && userRoleLower.includes('bms')) ||
+                         (assignedUserLower.includes('plumber') && (userRoleLower.includes('plumb') || userCats.includes('plumbing'))) ||
+                         (assignedUserLower.includes('painter') && (userRoleLower.includes('paint') || userCats.includes('painting')));
+      const isCatTeam = assignedUserLower.startsWith('mst specialist team') && (userCats.includes(snagCatLower) || userRoleLower.includes('mst'));
 
-    // Check if assigned to logged-in user's team / category
-    let isAssignedToMyTeam = userCats.includes(snagCatLower);
-    if (curUser.role === 'MST') {
-      if (snagCatLower === 'general' || snagCatLower === 'electrical') {
-        isAssignedToMyTeam = true;
+      if (!isDirect && !isMobile && !isTeamRole && !isCatTeam && curUser.role !== 'Admin') {
+        return false;
       }
-    }
-    if (curUser.role === 'Admin') {
-      isAssignedToMyTeam = true;
-    }
-
-    // Filter Scope Selection
-    if (filterScope === 'raised' && !isRaisedByMe) return false;
-    if (filterScope === 'assigned' && !isAssignedToMyTeam) return false;
-    if (filterScope === 'all' && curUser.role !== 'Admin') {
-      if (!isRaisedByMe && !isAssignedToMyTeam) return false;
+    } else if (activeTab === 'raised') {
+      if (createdByLower !== userNameLower) return false;
+    } else if (activeTab === 'all') {
+      // "All Snags" tab shows all snags across all users & categories
     }
 
-    // Filter Status Selection
-    if (filterStatus !== 'all' && snag.status !== filterStatus) return false;
+    // 2. Category Filter
+    if (categoryFilter !== 'all' && snag.category !== categoryFilter) return false;
 
-    // Search Query
+    // 3. Status Filter
+    if (statusFilter !== 'all' && snag.status !== statusFilter) return false;
+
+    // 4. Search Query
     if (searchQuery) {
-      const match = snag.location.toLowerCase().includes(searchQuery) ||
+      const match = snag.id.toLowerCase().includes(searchQuery) ||
+                    snag.location.toLowerCase().includes(searchQuery) ||
+                    snag.floor.toLowerCase().includes(searchQuery) ||
                     snag.area.toLowerCase().includes(searchQuery) ||
+                    snag.category.toLowerCase().includes(searchQuery) ||
                     snag.description.toLowerCase().includes(searchQuery) ||
-                    snag.id.toLowerCase().includes(searchQuery) ||
-                    (snag.createdBy && snag.createdBy.toLowerCase().includes(searchQuery)) ||
-                    (snag.assignedUser && snag.assignedUser.toLowerCase().includes(searchQuery));
+                    (snag.assignedUser && snag.assignedUser.toLowerCase().includes(searchQuery)) ||
+                    (snag.createdBy && snag.createdBy.toLowerCase().includes(searchQuery));
       if (!match) return false;
     }
+
     return true;
   });
 
@@ -1072,49 +1209,56 @@ function renderUserSnagsFeed() {
   document.getElementById('userFeedCount').textContent = `${total} items`;
 
   if (filtered.length === 0) {
+    const tabLabel = activeTab === 'assigned' ? 'Assigned to You' : activeTab === 'raised' ? 'Raised by You' : 'All Site Snags';
     grid.innerHTML = `
-      <div class="col-span-full glass-panel p-8 text-center rounded-2xl space-y-3">
-        <div class="w-12 h-12 rounded-full bg-slate-800 text-slate-500 flex items-center justify-center mx-auto text-xl">
+      <div class="col-span-full glass-panel p-8 text-center rounded-2xl space-y-3 border border-slate-800">
+        <div class="w-12 h-12 rounded-full bg-slate-900 text-slate-500 flex items-center justify-center mx-auto text-xl border border-slate-800">
           <i class="fa-solid fa-folder-open"></i>
         </div>
-        <h4 class="text-sm font-bold text-slate-300">No Snag Observations Found</h4>
-        <p class="text-xs text-slate-500">No snag observations match your selected filter (${filterScope === 'raised' ? 'Raised by Me' : filterScope === 'assigned' ? 'Assigned to My Team' : 'All My Snags'}).</p>
+        <h4 class="text-sm font-bold text-slate-300">No Snags in ${tabLabel}</h4>
+        <p class="text-xs text-slate-500 max-w-md mx-auto">No observation records match your selected filter (${categoryFilter !== 'all' ? categoryFilter : 'All Categories'} • ${statusFilter !== 'all' ? statusFilter : 'All Statuses'}).</p>
       </div>
     `;
     return;
   }
 
-  // Render Snag Cards
+  // Render Snag Cards with Assigned Specialist info, Closure Status & Photo requirements
   grid.innerHTML = filtered.map(snag => {
     const catClass = getCategoryBadgeClass(snag.category);
     const statusClass = getStatusBadgeClass(snag.status);
     const creatorName = snag.createdBy || 'Inspector';
+    const assignedName = snag.assignedUser || 'Specialist Team';
+    const hasClosure = !!snag.closurePhoto;
 
     return `
       <div class="glass-panel rounded-2xl overflow-hidden snag-card flex flex-col justify-between border border-slate-800">
         <!-- Photo Container -->
         <div class="relative bg-black h-48 overflow-hidden group">
-          <img src="${snag.closurePhoto || snag.photo}" alt="${snag.id}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" onclick="downloadAndZoomPhoto('${snag.closurePhoto || snag.photo}', '${snag.id}_Photo.jpg', '${snag.closurePhoto ? 'Closure Evidence Photo' : 'Initial Defect Photo'}')" title="Click to Download & View Clear High-Res Photo">
+          <img src="${hasClosure ? snag.closurePhoto : snag.photo}" alt="${snag.id}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" onclick="downloadAndZoomPhoto('${hasClosure ? snag.closurePhoto : snag.photo}', '${snag.id}_Photo.jpg', '${hasClosure ? 'Closure Evidence Photo' : 'Initial Defect Photo'}')" title="Click to View Full High-Res Photo">
           
           <!-- Category & Status Badge Overlay -->
-          <div class="absolute top-2 left-2 flex flex-wrap items-center gap-1.5">
+          <div class="absolute top-2 left-2 flex flex-wrap items-center gap-1.5 z-10">
             <span class="${catClass} px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase shadow">
               ${snag.category}
             </span>
             <span class="${statusClass} px-2.5 py-0.5 rounded-full text-[10px] font-extrabold shadow">
               ${snag.status}
             </span>
-            ${snag.closurePhoto ? `
+            ${hasClosure ? `
               <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/90 text-white shadow border border-emerald-400/50 flex items-center gap-1">
-                <i class="fa-solid fa-circle-check"></i> Closure Photo
+                <i class="fa-solid fa-circle-check"></i> Closure Photo ✓
               </span>
-            ` : ''}
+            ` : `
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/90 text-slate-950 shadow flex items-center gap-1">
+                <i class="fa-solid fa-camera"></i> Photo Needed to Close
+              </span>
+            `}
           </div>
 
           <!-- Timestamp Watermark Overlay -->
           <div class="stamped-badge-overlay flex items-center justify-between text-[10px]">
             <span><i class="fa-solid fa-clock mr-1 text-cyan-400"></i>${snag.timestamp}</span>
-            <span><i class="fa-solid fa-location-crosshairs mr-1 text-rose-400"></i>${snag.floor}</span>
+            <span><i class="fa-solid fa-location-crosshairs mr-1 text-rose-400"></i>${snag.location} (${snag.floor})</span>
           </div>
         </div>
 
@@ -1123,26 +1267,34 @@ function renderUserSnagsFeed() {
           <div class="space-y-2">
             <div class="flex items-center justify-between">
               <span class="text-xs font-extrabold font-mono text-cyan-400">${snag.id}</span>
-              <span class="text-[10px] font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+              <span class="text-[10px] font-semibold text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-700">
                 Priority: <strong class="text-amber-400">${snag.priority}</strong>
               </span>
             </div>
 
             <div>
-              <h4 class="text-xs font-bold text-white line-clamp-1">${snag.location} - ${snag.area}</h4>
-              <p class="text-xs text-slate-400 line-clamp-2 mt-1 leading-relaxed">${snag.description}</p>
+              <h4 class="text-xs font-bold text-white line-clamp-1">${snag.location} - ${snag.floor} (${snag.area})</h4>
+              <p class="text-xs text-slate-400 line-clamp-2 mt-1 leading-relaxed">${snag.description || 'No description'}</p>
 
-              <div class="mt-2.5 pt-2 border-t border-slate-800/80 space-y-1 text-[10px] font-mono text-slate-400">
-                <div class="flex items-center justify-between">
-                  <span><i class="fa-solid fa-user-pen text-cyan-400 mr-1"></i>Raised By: <strong class="text-slate-200">${creatorName}</strong></span>
-                  <span><i class="fa-solid fa-user-gear text-teal-400 mr-1"></i>Team: <strong class="text-slate-200">${snag.category}</strong></span>
+              <!-- Prominent Raised By & Assigned To Category Badges -->
+              <div class="mt-2.5 pt-2 border-t border-slate-800/80 space-y-1.5 text-[11px]">
+                <div class="flex items-center justify-between bg-slate-950/70 px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs">
+                  <span class="text-slate-400 flex items-center gap-1.5"><i class="fa-solid fa-user-pen text-cyan-400"></i>Raised by:</span>
+                  <strong class="text-cyan-300 font-bold">${creatorName}</strong>
+                </div>
+                <div class="flex items-center justify-between bg-slate-950/70 px-2.5 py-1.5 rounded-lg border border-amber-500/20 text-xs">
+                  <span class="text-slate-400 flex items-center gap-1.5"><i class="fa-solid fa-layer-group text-amber-400"></i>Assigned to:</span>
+                  <div class="text-right">
+                    <span class="font-bold text-amber-300">${snag.category}</span>
+                    <span class="text-[10px] text-slate-400 block font-mono">(${assignedName})</span>
+                  </div>
                 </div>
               </div>
 
               ${snag.technicianRemark ? `
                 <div class="mt-2 text-[11px] bg-slate-950/80 p-2 rounded-lg border border-cyan-500/30 text-cyan-300 font-mono">
                   <div class="flex items-center justify-between text-[10px] font-bold text-amber-400 mb-0.5">
-                    <span>💬 MST Remark</span>
+                    <span>💬 Remark</span>
                     <span class="text-[9px] text-slate-400 font-normal">${snag.remarkTimestamp || ''}</span>
                   </div>
                   <p class="text-slate-200 line-clamp-2 leading-tight">${snag.technicianRemark}</p>
@@ -1153,14 +1305,14 @@ function renderUserSnagsFeed() {
 
           <!-- Bottom Action Toolbar -->
           <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
-            <select onchange="updateSnagStatusDirect('${snag.id}', this.value)" class="bg-slate-900 border border-slate-700 text-[11px] text-slate-200 rounded-lg px-2 py-1 focus:outline-none">
+            <select onchange="updateSnagStatusDirect('${snag.id}', this.value)" class="bg-slate-900 border border-slate-700 text-[11px] text-slate-200 rounded-lg px-2 py-1 focus:outline-none cursor-pointer">
               <option value="Open" ${snag.status === 'Open' ? 'selected' : ''}>🔴 Open</option>
               <option value="In Progress" ${snag.status === 'In Progress' ? 'selected' : ''}>🟡 In Progress</option>
-              <option value="Resolved" ${snag.status === 'Resolved' ? 'selected' : ''}>🟢 Resolved</option>
+              <option value="Resolved" ${snag.status === 'Resolved' ? 'selected' : ''}>🟢 Resolved ${hasClosure ? '✓' : '(Needs Photo)'}</option>
             </select>
 
-            <button onclick="openDetailModal('${snag.id}')" class="px-3 py-1 rounded-lg ${snag.closurePhoto ? 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border-emerald-500/30' : 'bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border-cyan-500/30'} font-semibold text-xs border flex items-center gap-1 transition">
-              <i class="fa-solid ${snag.closurePhoto ? 'fa-eye' : 'fa-camera'}"></i> ${snag.closurePhoto ? 'View Detail' : 'Closure & Detail'}
+            <button onclick="openDetailModal('${snag.id}')" class="px-3 py-1.5 rounded-lg ${hasClosure ? 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border-emerald-500/30' : 'bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border-cyan-500/30'} font-semibold text-xs border flex items-center gap-1.5 transition active:scale-95">
+              <i class="fa-solid ${hasClosure ? 'fa-circle-check text-emerald-400' : 'fa-camera text-cyan-400'}"></i> ${hasClosure ? 'View Details' : 'Upload Closure'}
             </button>
           </div>
         </div>
@@ -1216,7 +1368,7 @@ function renderAdminSnagsTable() {
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" class="px-4 py-8 text-center text-slate-500 font-medium">
+        <td colspan="8" class="px-4 py-8 text-center text-slate-500 font-medium">
           No observation records match the selected month and filter criteria.
         </td>
       </tr>
@@ -1257,12 +1409,21 @@ function renderAdminSnagsTable() {
           <div class="text-[10px] text-slate-400">${snag.floor} • ${snag.area}</div>
         </td>
         <td class="px-3 py-3">
-          <span class="${catClass} px-2.5 py-0.5 rounded-full text-[10px] font-bold">
-            ${snag.category}
-          </span>
+          <div class="font-bold text-cyan-300 text-xs flex items-center gap-1.5">
+            <i class="fa-solid fa-user-pen text-cyan-400 text-[10px]"></i>
+            <span>${snag.createdBy || 'Inspector'}</span>
+          </div>
         </td>
-        <td class="px-3 py-3 text-xs text-slate-300">
-          ${snag.assignedUser}
+        <td class="px-3 py-3">
+          <div class="space-y-0.5">
+            <span class="${catClass} px-2 py-0.5 rounded-full text-[10px] font-extrabold inline-block">
+              ${snag.category}
+            </span>
+            <div class="text-[10px] text-slate-300 font-mono flex items-center gap-1 mt-0.5">
+              <i class="fa-solid fa-user-gear text-amber-400 text-[9px]"></i>
+              <span>${snag.assignedUser || 'Specialist Team'}</span>
+            </div>
+          </div>
         </td>
         <td class="px-3 py-3">
           <span class="${statusClass} px-2 py-0.5 rounded-full text-[10px] font-bold">
@@ -1320,6 +1481,59 @@ function closeCaptureModal() {
   document.getElementById('captureModal').classList.add('hidden');
 }
 
+function triggerNativeCamera() {
+  if (window.AndroidBridge && typeof window.AndroidBridge.openNativeCamera === 'function') {
+    window.AndroidBridge.openNativeCamera();
+    return;
+  }
+  const input = document.getElementById('nativeCameraInput');
+  if (input) {
+    input.value = '';
+    input.click();
+  }
+}
+
+window.onNativePhotoCaptured = function(base64Data) {
+  if (!base64Data) return;
+  const img = new Image();
+  img.onload = () => {
+    stopWebcamStream();
+    const canvas = document.getElementById('snapshotCanvas');
+    const ctx = canvas.getContext('2d');
+    const video = document.getElementById('webcamVideo');
+    const placeholder = document.getElementById('cameraPlaceholder');
+    const overlay = document.getElementById('cameraControlsOverlay');
+    const reticle = document.getElementById('cameraViewfinderGrid');
+    const retakeBtn = document.getElementById('retakeOverlay');
+
+    const maxDim = 800;
+    let w = img.width || 640;
+    let h = img.height || 480;
+    if (w > maxDim || h > maxDim) {
+      if (w > h) {
+        h = Math.round((h * maxDim) / w);
+        w = maxDim;
+      } else {
+        w = Math.round((w * maxDim) / h);
+        h = maxDim;
+      }
+    }
+
+    canvas.width = w;
+    canvas.height = h;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    STATE.capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.60);
+    if (video) video.classList.add('hidden');
+    if (overlay) overlay.classList.add('hidden');
+    if (reticle) reticle.classList.add('hidden');
+    if (placeholder) placeholder.classList.add('hidden');
+    if (canvas) canvas.classList.remove('hidden');
+    if (retakeBtn) retakeBtn.classList.remove('hidden');
+  };
+  img.src = base64Data;
+};
+
 async function startWebcamStream() {
   const video = document.getElementById('webcamVideo');
   const placeholder = document.getElementById('cameraPlaceholder');
@@ -1334,30 +1548,33 @@ async function startWebcamStream() {
   if (snapshotCanvas) snapshotCanvas.classList.add('hidden');
   if (retakeBtn) retakeBtn.classList.add('hidden');
 
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    console.warn('getUserMedia is not supported on this device/browser.');
-    if (placeholder) placeholder.classList.remove('hidden');
-    if (video) video.classList.add('hidden');
-    if (overlay) overlay.classList.add('hidden');
-    if (reticle) reticle.classList.add('hidden');
-    return;
+  let stream = null;
+
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    const currentFacing = STATE.facingMode || 'environment';
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: currentFacing },
+        audio: false
+      });
+    } catch (e1) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+      } catch (e2) {
+        console.warn('Live WebRTC camera error:', e2);
+      }
+    }
   }
 
-  try {
-    const currentFacing = STATE.facingMode || 'environment';
-    const constraints = {
-      video: {
-        facingMode: { ideal: currentFacing },
-        width: { ideal: 1280, min: 640 },
-        height: { ideal: 720, min: 480 }
-      },
-      audio: false
-    };
-
-    STATE.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+  if (stream) {
+    STATE.mediaStream = stream;
     if (video) {
-      video.srcObject = STATE.mediaStream;
+      video.srcObject = stream;
       video.setAttribute('playsinline', 'true');
+      video.setAttribute('webkit-playsinline', 'true');
       video.setAttribute('muted', 'true');
       video.muted = true;
       video.classList.remove('hidden');
@@ -1366,14 +1583,16 @@ async function startWebcamStream() {
     if (placeholder) placeholder.classList.add('hidden');
     if (overlay) overlay.classList.remove('hidden');
     if (reticle) reticle.classList.remove('hidden');
-  } catch (err) {
-    console.warn('Camera access error or permission denied:', err);
-    // Graceful fallback to file selection prompt
-    if (video) video.classList.add('hidden');
-    if (overlay) overlay.classList.add('hidden');
-    if (reticle) reticle.classList.add('hidden');
-    if (placeholder) placeholder.classList.remove('hidden');
+    return true;
   }
+
+  // If live stream is blocked, show clear prompt with native camera button
+  console.warn('Live viewfinder unavailable, ready for direct camera snap.');
+  if (video) video.classList.add('hidden');
+  if (overlay) overlay.classList.add('hidden');
+  if (reticle) reticle.classList.add('hidden');
+  if (placeholder) placeholder.classList.remove('hidden');
+  return false;
 }
 
 function switchCameraFacing() {
@@ -1660,6 +1879,20 @@ function deleteSnagRecord(snagId) {
 }
 
 function updateSnagStatusDirect(snagId, newStatus) {
+  const target = snagsStore.find(s => s.id === snagId);
+  if (!target) return;
+
+  // Strict check: Snags can ONLY be resolved/closed when closure photo is uploaded
+  if (newStatus === 'Resolved' && !target.closurePhoto) {
+    alert(`⚠️ Closure Evidence Photo Required!\n\nSnag ${snagId} CANNOT be marked as "Resolved" without uploading a closure photo showing the resolved defect.\n\nOpening snag details modal so you can upload the closure photo proof.`);
+    openDetailModal(snagId);
+    setTimeout(() => {
+      triggerClosureFileSelect();
+    }, 450);
+    renderApp();
+    return;
+  }
+
   updateSnagStatusAndRemark(snagId, newStatus, '', null, false);
 }
 
@@ -1667,6 +1900,13 @@ function updateSnagStatusAndRemark(snagId, newStatus, remarkText, closurePhotoDa
   const target = snagsStore.find(s => s.id === snagId);
   if (!target) {
     console.error('Target snag not found:', snagId);
+    return;
+  }
+
+  // Strict check: Cannot set to Resolved if no closure photo exists or staged
+  const finalHasPhoto = (!removeClosure && target.closurePhoto) || !!closurePhotoDataUrl;
+  if (newStatus === 'Resolved' && !finalHasPhoto) {
+    alert(`⚠️ Closure Photo Required!\n\nSnag ${snagId} cannot be marked as Resolved without a closure photo.`);
     return;
   }
 
@@ -2010,6 +2250,15 @@ function openDetailModal(snagId) {
   document.getElementById('detailFloor').textContent = snag.floor;
   document.getElementById('detailArea').textContent = snag.area;
   document.getElementById('detailPriority').textContent = snag.priority;
+
+  const detailRaisedByEl = document.getElementById('detailRaisedBy');
+  if (detailRaisedByEl) detailRaisedByEl.textContent = snag.createdBy || 'Inspector';
+
+  const detailAssignedCatEl = document.getElementById('detailAssignedToCategory');
+  if (detailAssignedCatEl) {
+    detailAssignedCatEl.textContent = `${snag.category} (${snag.assignedUser || 'Specialist Team'})`;
+  }
+
   document.getElementById('detailDescription').textContent = snag.description;
   document.getElementById('detailStatusSelect').value = snag.status;
   
@@ -2055,23 +2304,44 @@ function closeDetailModal() {
   document.getElementById('detailModal').classList.add('hidden');
 }
 
+// Global hooks for Native Android Notification tap handling
+window.openDetailModal = openDetailModal;
+window.openDetailModalDirect = function(snagId) {
+  if (!snagId) return;
+  setTimeout(() => {
+    openDetailModal(snagId);
+  }, 400);
+};
+
 function saveDetailStatusUpdate() {
   if (!STATE.activeDetailSnagId) return;
+  const target = snagsStore.find(s => s.id === STATE.activeDetailSnagId);
+  if (!target) return;
+
   const newStatus = document.getElementById('detailStatusSelect').value;
   const remarkText = document.getElementById('detailTechnicianRemark')?.value.trim() || '';
   const newAssignedUser = document.getElementById('detailAssignedUser')?.value || '';
+
+  const willHaveClosurePhoto = (!STATE.removeClosurePhotoFlag && target.closurePhoto) || !!STATE.stagedClosurePhoto;
+
+  // Strict check: Cannot mark as Resolved without a closure photo
+  if (newStatus === 'Resolved' && !willHaveClosurePhoto) {
+    alert(`⚠️ Closure Evidence Photo Required!\n\nSnag observation ${target.id} can ONLY be closed/resolved after uploading a closure photo showing the completed repair.\n\nPlease tap "Upload Proof" below to attach the photo before resolving.`);
+    triggerClosureFileSelect();
+    return;
+  }
 
   updateSnagStatusAndRemark(
     STATE.activeDetailSnagId, 
     newStatus, 
     remarkText, 
     STATE.stagedClosurePhoto, 
-    STATE.removeClosurePhotoFlag,
+    STATE.removeClosurePhotoFlag, 
     newAssignedUser
   );
 
   closeDetailModal();
-  alert(`✅ Snag ${STATE.activeDetailSnagId} updated successfully!`);
+  alert(`✅ Snag ${STATE.activeDetailSnagId} updated successfully!${newStatus === 'Resolved' ? ' Marked as Resolved with Closure Evidence Photo.' : ''}`);
 }
 
 
@@ -2310,10 +2580,11 @@ function exportToExcel() {
     'Building': snag.location,
     'Floor Level': snag.floor,
     'Location': snag.area,
-    'Category': snag.category,
+    'Raised by (Name)': snag.createdBy || 'Inspector',
+    'Assigned to (Category)': snag.category,
+    'Assigned Specialist': snag.assignedUser || 'Specialist Team',
     'Priority': snag.priority,
     'Status': snag.status,
-    'Assigned Team / User': snag.assignedUser,
     'Closure Photo Uploaded': snag.closurePhoto ? 'Yes' : 'No',
     'Closure Date & Time': snag.closureTimestamp || 'N/A',
     'Observation Remarks': snag.description,
@@ -2390,26 +2661,28 @@ function exportToPDF() {
     s.id,
     s.timestamp,
     `${s.location}\n(${s.floor} - ${s.area})`,
-    s.category,
+    s.createdBy || 'Inspector',
+    `${s.category}\n(${s.assignedUser || 'Specialist'})`,
     s.priority,
     s.closurePhoto ? `${s.status}\n(Closure ✓)` : s.status
   ]);
 
   doc.autoTable({
     startY: 60,
-    head: [['#', 'Snag ID', 'Date/Time', 'Building & Location', 'Category', 'Priority', 'Status']],
+    head: [['#', 'Snag ID', 'Date/Time', 'Building & Location', 'Raised by (Name)', 'Assigned to (Category)', 'Priority', 'Status']],
     body: tableData,
     theme: 'grid',
-    headStyles: { fillStyle: 'F', fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-    bodyStyles: { fontSize: 8, textColor: [30, 41, 59] },
+    headStyles: { fillStyle: 'F', fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
+    bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59] },
     columnStyles: {
-      0: { cellWidth: 10 },
-      1: { cellWidth: 28, fontStyle: 'bold' },
-      2: { cellWidth: 32 },
-      3: { cellWidth: 50 },
-      4: { cellWidth: 25 },
-      5: { cellWidth: 20 },
-      6: { cellWidth: 20 }
+      0: { cellWidth: 8 },
+      1: { cellWidth: 24, fontStyle: 'bold' },
+      2: { cellWidth: 26 },
+      3: { cellWidth: 36 },
+      4: { cellWidth: 24 },
+      5: { cellWidth: 32 },
+      6: { cellWidth: 16 },
+      7: { cellWidth: 18 }
     }
   });
 
