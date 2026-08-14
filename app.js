@@ -1310,6 +1310,9 @@ function openCaptureModal() {
   if (inputAssigned) {
     renderAssignedUserOptions(inputAssigned, inputCat?.value || 'Electrical');
   }
+
+  // Automatically launch Live Camera Viewfinder!
+  startWebcamStream();
 }
 
 function closeCaptureModal() {
@@ -1321,33 +1324,60 @@ async function startWebcamStream() {
   const video = document.getElementById('webcamVideo');
   const placeholder = document.getElementById('cameraPlaceholder');
   const overlay = document.getElementById('cameraControlsOverlay');
+  const reticle = document.getElementById('cameraViewfinderGrid');
   const uploadPreview = document.getElementById('uploadImagePreview');
   const snapshotCanvas = document.getElementById('snapshotCanvas');
+  const retakeBtn = document.getElementById('retakeOverlay');
 
   stopWebcamStream();
-  uploadPreview.classList.add('hidden');
-  snapshotCanvas.classList.add('hidden');
+  if (uploadPreview) uploadPreview.classList.add('hidden');
+  if (snapshotCanvas) snapshotCanvas.classList.add('hidden');
+  if (retakeBtn) retakeBtn.classList.add('hidden');
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    console.warn('getUserMedia is not supported on this device/browser.');
+    if (placeholder) placeholder.classList.remove('hidden');
+    if (video) video.classList.add('hidden');
+    if (overlay) overlay.classList.add('hidden');
+    if (reticle) reticle.classList.add('hidden');
+    return;
+  }
 
   try {
+    const currentFacing = STATE.facingMode || 'environment';
     const constraints = {
       video: {
-        facingMode: STATE.facingMode,
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      }
+        facingMode: { ideal: currentFacing },
+        width: { ideal: 1280, min: 640 },
+        height: { ideal: 720, min: 480 }
+      },
+      audio: false
     };
+
     STATE.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-    video.srcObject = STATE.mediaStream;
-    video.classList.remove('hidden');
-    placeholder.classList.add('hidden');
-    overlay.classList.remove('hidden');
+    if (video) {
+      video.srcObject = STATE.mediaStream;
+      video.setAttribute('playsinline', 'true');
+      video.setAttribute('muted', 'true');
+      video.muted = true;
+      video.classList.remove('hidden');
+      await video.play().catch(e => console.warn('Video play catch:', e));
+    }
+    if (placeholder) placeholder.classList.add('hidden');
+    if (overlay) overlay.classList.remove('hidden');
+    if (reticle) reticle.classList.remove('hidden');
   } catch (err) {
-    alert('Camera access denied or unavailable. You can use the "Upload Image" option instead!');
+    console.warn('Camera access error or permission denied:', err);
+    // Graceful fallback to file selection prompt
+    if (video) video.classList.add('hidden');
+    if (overlay) overlay.classList.add('hidden');
+    if (reticle) reticle.classList.add('hidden');
+    if (placeholder) placeholder.classList.remove('hidden');
   }
 }
 
 function switchCameraFacing() {
-  STATE.facingMode = STATE.facingMode === 'user' ? 'environment' : 'user';
+  STATE.facingMode = (STATE.facingMode === 'user') ? 'environment' : 'user';
   startWebcamStream();
 }
 
@@ -1357,9 +1387,14 @@ function stopWebcamStream() {
     STATE.mediaStream = null;
   }
   const video = document.getElementById('webcamVideo');
-  if (video) video.classList.add('hidden');
+  if (video) {
+    video.srcObject = null;
+    video.classList.add('hidden');
+  }
   const overlay = document.getElementById('cameraControlsOverlay');
   if (overlay) overlay.classList.add('hidden');
+  const reticle = document.getElementById('cameraViewfinderGrid');
+  if (reticle) reticle.classList.add('hidden');
 }
 
 // Draw Photo Frame to Canvas & Apply Stamp Overlay (Compressed for Cloud Firestore)
@@ -1380,14 +1415,22 @@ function saveSnagsState() {
   }
 }
 
-// Draw Photo Frame to Canvas & Apply Stamp Overlay (Compresse// Draw Photo Frame to Canvas & Apply Stamp Overlay (Ultra-Light 12KB Payload)
+// Snap high-resolution photo from active video stream
 function takeCameraSnap() {
   const video = document.getElementById('webcamVideo');
   const canvas = document.getElementById('snapshotCanvas');
-  const ctx = canvas.getContext('2d');
+  const placeholder = document.getElementById('cameraPlaceholder');
+  const overlay = document.getElementById('cameraControlsOverlay');
+  const reticle = document.getElementById('cameraViewfinderGrid');
   const retakeBtn = document.getElementById('retakeOverlay');
 
-  const maxDim = 420;
+  if (!video || !video.videoWidth) {
+    alert('Camera stream is still initializing. Please wait a moment.');
+    return;
+  }
+
+  const ctx = canvas.getContext('2d');
+  const maxDim = 800;
   let w = video.videoWidth || 640;
   let h = video.videoHeight || 480;
   if (w > maxDim || h > maxDim) {
@@ -1406,11 +1449,18 @@ function takeCameraSnap() {
   // Draw Camera Frame
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  STATE.capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.35);
+  STATE.capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.50);
+
+  // Small haptic vibration feedback on snap
+  vibrateDevice([60]);
 
   stopWebcamStream();
-  canvas.classList.remove('hidden');
-  retakeBtn.classList.remove('hidden');
+  if (video) video.classList.add('hidden');
+  if (overlay) overlay.classList.add('hidden');
+  if (reticle) reticle.classList.add('hidden');
+  if (placeholder) placeholder.classList.add('hidden');
+  if (canvas) canvas.classList.remove('hidden');
+  if (retakeBtn) retakeBtn.classList.remove('hidden');
 }
 
 function handleFileInput(e) {
@@ -1421,12 +1471,16 @@ function handleFileInput(e) {
   reader.onload = (evt) => {
     const img = new Image();
     img.onload = () => {
+      stopWebcamStream();
       const canvas = document.getElementById('snapshotCanvas');
       const ctx = canvas.getContext('2d');
+      const video = document.getElementById('webcamVideo');
       const placeholder = document.getElementById('cameraPlaceholder');
+      const overlay = document.getElementById('cameraControlsOverlay');
+      const reticle = document.getElementById('cameraViewfinderGrid');
       const retakeBtn = document.getElementById('retakeOverlay');
 
-      const maxDim = 420;
+      const maxDim = 800;
       let w = img.width || 640;
       let h = img.height || 480;
       if (w > maxDim || h > maxDim) {
@@ -1443,7 +1497,10 @@ function handleFileInput(e) {
       canvas.height = h;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      STATE.capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.35);
+      STATE.capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.50);
+      if (video) video.classList.add('hidden');
+      if (overlay) overlay.classList.add('hidden');
+      if (reticle) reticle.classList.add('hidden');
       if (placeholder) placeholder.classList.add('hidden');
       if (canvas) canvas.classList.remove('hidden');
       if (retakeBtn) retakeBtn.classList.remove('hidden');
@@ -1461,12 +1518,21 @@ function stampCanvasMetadata(canvas, ctx) {
 function resetPhotoCapture() {
   stopWebcamStream();
   STATE.capturedPhotoDataUrl = null;
-  document.getElementById('webcamVideo').classList.add('hidden');
-  document.getElementById('snapshotCanvas').classList.add('hidden');
-  document.getElementById('uploadImagePreview').classList.add('hidden');
-  document.getElementById('retakeOverlay').classList.add('hidden');
-  document.getElementById('cameraControlsOverlay').classList.add('hidden');
-  document.getElementById('cameraPlaceholder').classList.remove('hidden');
+  const video = document.getElementById('webcamVideo');
+  const canvas = document.getElementById('snapshotCanvas');
+  const uploadPreview = document.getElementById('uploadImagePreview');
+  const retakeBtn = document.getElementById('retakeOverlay');
+  const overlay = document.getElementById('cameraControlsOverlay');
+  const reticle = document.getElementById('cameraViewfinderGrid');
+  const placeholder = document.getElementById('cameraPlaceholder');
+
+  if (video) video.classList.add('hidden');
+  if (canvas) canvas.classList.add('hidden');
+  if (uploadPreview) uploadPreview.classList.add('hidden');
+  if (retakeBtn) retakeBtn.classList.add('hidden');
+  if (overlay) overlay.classList.add('hidden');
+  if (reticle) reticle.classList.add('hidden');
+  if (placeholder) placeholder.classList.remove('hidden');
 }
 
 // Helper to automatically download captured/uploaded photos directly to local PC

@@ -638,40 +638,75 @@
             <span id="locationGpsText" class="text-[10px] text-cyan-400 font-mono"><i class="fa-solid fa-location-crosshairs mr-1"></i> Fetching GPS...</span>
           </label>
 
-          <!-- Camera & Photo Container (Mobile Responsive Viewport) -->
-          <div id="cameraBox" class="relative rounded-xl sm:rounded-2xl overflow-hidden bg-slate-950 border-2 border-cyan-500/30 min-h-[220px] max-h-[380px] h-[38vh] sm:min-h-[340px] sm:max-h-[440px] w-full flex items-center justify-center group shadow-2xl">
+          <!-- Camera & Photo Container (Live Viewfinder & Instant Snap) -->
+          <div id="cameraBox" class="relative rounded-xl sm:rounded-2xl overflow-hidden bg-slate-950 border-2 border-cyan-500/40 min-h-[260px] max-h-[420px] h-[45vh] sm:min-h-[340px] sm:max-h-[460px] w-full flex items-center justify-center group shadow-2xl">
             
-            <!-- Video Stream Element (for fallbacks) -->
-            <video id="webcamVideo" autoplay playsinline class="w-full h-full object-cover rounded-xl sm:rounded-2xl hidden"></video>
+            <!-- Live Video Stream Element -->
+            <video id="webcamVideo" autoplay playsinline muted class="w-full h-full object-cover rounded-xl sm:rounded-2xl hidden"></video>
             
-            <!-- Captured Stamped Canvas Preview -->
+            <!-- Camera Viewfinder Focus Reticle Overlay -->
+            <div id="cameraViewfinderGrid" class="absolute inset-0 pointer-events-none hidden flex items-center justify-center">
+              <div class="w-48 h-48 border-2 border-cyan-400/40 rounded-2xl relative animate-pulse">
+                <div class="absolute -top-1.5 -left-1.5 w-4 h-4 border-t-2 border-l-2 border-cyan-400"></div>
+                <div class="absolute -top-1.5 -right-1.5 w-4 h-4 border-t-2 border-r-2 border-cyan-400"></div>
+                <div class="absolute -bottom-1.5 -left-1.5 w-4 h-4 border-b-2 border-l-2 border-cyan-400"></div>
+                <div class="absolute -bottom-1.5 -right-1.5 w-4 h-4 border-b-2 border-r-2 border-cyan-400"></div>
+              </div>
+            </div>
+
+            <!-- Floating Live Camera Shutter & Control Bar -->
+            <div id="cameraControlsOverlay" class="absolute bottom-3 left-0 right-0 z-20 flex items-center justify-center gap-4 sm:gap-6 px-4 hidden">
+              <!-- Switch Camera Facing -->
+              <button type="button" onclick="switchCameraFacing()" class="w-11 h-11 rounded-full bg-slate-900/80 hover:bg-slate-800 text-white border border-slate-700 flex items-center justify-center text-base shadow-xl active:scale-95 transition" title="Switch Front/Rear Camera">
+                <i class="fa-solid fa-camera-rotate"></i>
+              </button>
+
+              <!-- Big Shutter Snap Button -->
+              <button type="button" onclick="takeCameraSnap()" class="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white flex items-center justify-center text-2xl shadow-2xl shadow-cyan-500/50 border-4 border-white/80 active:scale-90 transition transform" title="Take Snap Photo">
+                <i class="fa-solid fa-camera"></i>
+              </button>
+
+              <!-- Gallery / File Upload Option -->
+              <label class="w-11 h-11 rounded-full bg-slate-900/80 hover:bg-slate-800 text-cyan-300 border border-slate-700 flex items-center justify-center text-base shadow-xl active:scale-95 transition cursor-pointer" title="Choose from Files / Gallery">
+                <i class="fa-solid fa-folder-open"></i>
+                <input type="file" accept="image/*" onchange="handleFileInput(event)" class="hidden">
+              </label>
+            </div>
+
+            <!-- Captured Canvas Stamped Preview -->
             <canvas id="snapshotCanvas" class="w-full h-full object-contain rounded-xl sm:rounded-2xl hidden"></canvas>
 
             <!-- Upload Placeholder Image Preview -->
             <img id="uploadImagePreview" class="w-full h-full object-contain rounded-xl sm:rounded-2xl hidden" alt="Uploaded snag preview">
 
-            <!-- Empty Camera Placeholder / Prompt -->
+            <!-- Empty Camera Placeholder / Prompt (Fallback & Camera Launch Prompt) -->
             <div id="cameraPlaceholder" class="p-4 sm:p-8 text-center space-y-3">
-              <div class="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-slate-800/90 text-cyan-400 flex items-center justify-center mx-auto text-2xl sm:text-3xl border border-cyan-500/40 shadow-xl">
+              <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-800/90 text-cyan-400 flex items-center justify-center mx-auto text-2xl sm:text-3xl border border-cyan-500/40 shadow-xl">
                 <i class="fa-solid fa-camera"></i>
               </div>
               <div>
-                <p class="text-sm sm:text-base font-extrabold text-white">Click Photo from Device Camera</p>
-                <p class="text-[11px] sm:text-xs text-slate-400 max-w-md mx-auto">Click below to open device camera or select image. Real-time date/time & GPS watermark stamp is added automatically.</p>
+                <p class="text-sm sm:text-base font-extrabold text-white">Live Camera Viewfinder</p>
+                <p class="text-[11px] sm:text-xs text-slate-400 max-w-md mx-auto">Open device camera to snap defect photo directly with live view, or upload an image file.</p>
               </div>
               <div class="flex flex-wrap items-center justify-center gap-2 sm:gap-3 pt-1">
-                <label class="px-5 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs sm:text-sm cursor-pointer shadow-lg shadow-cyan-500/25 flex items-center gap-2 active:scale-95 transition">
-                  <i class="fa-solid fa-camera text-base sm:text-lg"></i> Take Photo / Choose Image
-                  <input type="file" accept="image/*" capture="environment" onchange="handleFileInput(event)" class="hidden">
+                <button type="button" onclick="startWebcamStream()" class="px-5 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs sm:text-sm cursor-pointer shadow-lg shadow-cyan-500/25 flex items-center gap-2 active:scale-95 transition">
+                  <i class="fa-solid fa-video text-base sm:text-lg"></i> Open Live Camera
+                </button>
+                <label class="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm border border-slate-700 cursor-pointer flex items-center gap-2 active:scale-95 transition">
+                  <i class="fa-solid fa-image text-base sm:text-lg text-amber-400"></i> Choose File / Gallery
+                  <input type="file" accept="image/*" onchange="handleFileInput(event)" class="hidden">
                 </label>
               </div>
             </div>
 
-            <!-- Retake Photo Action (Visible when photo captured) -->
-            <div id="retakeOverlay" class="absolute top-2 right-2 sm:top-3 sm:right-3 hidden z-10">
-              <label class="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-black/80 hover:bg-black text-cyan-300 text-xs font-bold backdrop-blur flex items-center gap-1.5 border border-cyan-500/40 shadow-xl cursor-pointer transition">
-                <i class="fa-solid fa-rotate-left"></i> Retake / Change Photo
-                <input type="file" accept="image/*" capture="environment" onchange="handleFileInput(event)" class="hidden">
+            <!-- Retake Photo Action (Visible when photo is snapped) -->
+            <div id="retakeOverlay" class="absolute top-2 right-2 sm:top-3 sm:right-3 hidden z-20 flex items-center gap-2">
+              <button type="button" onclick="startWebcamStream()" class="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-cyan-600/90 hover:bg-cyan-500 text-white text-xs font-bold backdrop-blur flex items-center gap-1.5 border border-cyan-400/50 shadow-xl transition active:scale-95">
+                <i class="fa-solid fa-camera"></i> Live Camera Retake
+              </button>
+              <label class="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-xs font-bold backdrop-blur flex items-center gap-1.5 border border-slate-700 shadow-xl cursor-pointer transition active:scale-95">
+                <i class="fa-solid fa-folder-open text-amber-400"></i> Change File
+                <input type="file" accept="image/*" onchange="handleFileInput(event)" class="hidden">
               </label>
             </div>
           </div>
