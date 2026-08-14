@@ -17,6 +17,7 @@ const DEFAULT_FIREBASE_CONFIG = {
 
 // Global Application State
 let knownSnagIds = new Set();
+let knownSnagAssignments = new Map();
 
 const STATE = {
   activeSection: 'user', // 'user' or 'admin'
@@ -178,8 +179,32 @@ function initLiveClock() {
 
 
 // ==========================================================================
-// FCM PUSH NOTIFICATION, HAPTIC VIBRATION & IN-APP TOAST MODULE
+// PUSH NOTIFICATION, NATIVE APK VIBRATION & REAL-TIME MELODIC RING SYSTEM
 // ==========================================================================
+
+// Global AudioContext with automatic unlock on first user gesture
+let audioCtxInstance = null;
+function getAudioContext() {
+  if (!audioCtxInstance) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      audioCtxInstance = new AudioContextClass();
+    }
+  }
+  if (audioCtxInstance && audioCtxInstance.state === 'suspended') {
+    audioCtxInstance.resume().catch(() => {});
+  }
+  return audioCtxInstance;
+}
+
+// User interaction listener to immediately unlock Web Audio API AudioContext
+['click', 'touchstart', 'touchend', 'pointerdown', 'keydown'].forEach(evt => {
+  window.addEventListener(evt, () => {
+    try {
+      getAudioContext();
+    } catch (e) {}
+  }, { once: false, passive: true });
+});
 
 function requestNotificationPermission() {
   if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
@@ -189,40 +214,140 @@ function requestNotificationPermission() {
   }
 }
 
-function triggerSnagAssignmentNotification(snag) {
-  if (!snag) return;
-  const userRole = STATE.currentUser?.role;
-  const userCat = STATE.currentUser?.category;
+/**
+ * Triggers physical device vibration
+ * Supports: Native Android APK Bridge, Web Vibration API
+ */
+function vibrateDevice(pattern = [0, 400, 200, 400, 200, 800]) {
+  try {
+    // 1. Android Native APK Bridge
+    if (window.AndroidBridge && typeof window.AndroidBridge.vibratePattern === 'function') {
+      const csv = Array.isArray(pattern) ? pattern.join(',') : '0,400,200,400,200,800';
+      window.AndroidBridge.vibratePattern(csv);
+      console.log('📳 Native Android APK Vibration triggered:', csv);
+      return;
+    }
+    
+    // 2. HTML5 Web Navigator Vibration API
+    if ('vibrate' in navigator) {
+      navigator.vibrate(pattern);
+      console.log('📳 Web Navigator Vibration triggered:', pattern);
+    }
+  } catch (e) {
+    console.warn('Vibration error:', e);
+  }
+}
 
-  // Check if target user is MST, Engineer, Supervisor, Admin, or assigned to this category
-  const isTargetUser = !STATE.currentUser || 
-    userRole === 'MST' || 
-    userRole === 'Engineer' || 
-    userRole === 'Admin' || 
-    userRole === 'Supervisor' || 
-    userCat === snag.category || 
-    snag.category === 'Electrical';
-
-  if (!isTargetUser) return;
-
-  const title = `⚡ New ${snag.category} Snag Assigned! (${snag.id})`;
-  const bodyText = `Location: ${snag.location} - ${snag.floor} (${snag.area})\nPriority: ${snag.priority}\nRemarks: ${snag.description}`;
-
-  // 1. Double-Pulse Haptic Vibration (Mobile Devices)
-  if ('vibrate' in navigator) {
-    try {
-      navigator.vibrate([300, 100, 300, 100, 500]);
-    } catch (e) {}
+/**
+ * Plays high-priority loud melodic notification ringtone chime
+ * Supports: Native Android RingtoneManager in APK + Web Audio API synthesizer
+ */
+function playSnagRingSound() {
+  try {
+    // 1. Android Native APK Ringtone / Sound (Plays system notification / ringtone sound)
+    if (window.AndroidBridge && typeof window.AndroidBridge.playRingSound === 'function') {
+      window.AndroidBridge.playRingSound();
+      console.log('🔔 Native Android APK Ringtone triggered via RingtoneManager');
+    }
+  } catch (e) {
+    console.warn('Native ring sound error:', e);
   }
 
-  // 2. System Push Notification (Browser / FCM API)
-  if ('Notification' in window && Notification.permission === 'granted') {
-    try {
+  // 2. Synthesize Rich High-Clarity Multi-Tone Melodic Chime Ringtone
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+
+    // A melodic 6-tone ascending alert chime with dual harmonic oscillators
+    // Sequence: D5 (587.3Hz) -> F#5 (739.9Hz) -> A5 (880Hz) -> D6 (1174.6Hz) -> F#6 (1479.9Hz) -> Chord (D6+A6)
+    const notes = [
+      { freq: 587.33, start: 0.00, dur: 0.18, vol: 0.35, type: 'triangle' },
+      { freq: 739.99, start: 0.12, dur: 0.18, vol: 0.40, type: 'triangle' },
+      { freq: 880.00, start: 0.24, dur: 0.22, vol: 0.45, type: 'triangle' },
+      { freq: 1174.66, start: 0.40, dur: 0.35, vol: 0.55, type: 'sine' },
+      { freq: 1479.98, start: 0.58, dur: 0.30, vol: 0.50, type: 'sine' },
+      { freq: 1760.00, start: 0.70, dur: 0.65, vol: 0.60, type: 'sine' },
+      { freq: 1174.66, start: 0.70, dur: 0.65, vol: 0.40, type: 'triangle' } // Harmonic under-layer
+    ];
+
+    notes.forEach(n => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = n.type;
+      osc.frequency.setValueAtTime(n.freq, now + n.start);
+
+      // Attack & Decay Envelope for realistic bell/chime ring
+      gain.gain.setValueAtTime(0.0001, now + n.start);
+      gain.gain.exponentialRampToValueAtTime(n.vol, now + n.start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + n.start + n.dur);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now + n.start);
+      osc.stop(now + n.start + n.dur + 0.05);
+    });
+
+    console.log('🎵 Melodic Ringtone Chime Synthesizer triggered');
+  } catch (err) {
+    console.warn('Web Audio synthesis error:', err);
+  }
+}
+
+/**
+ * Core Snag Assignment Notification Dispatcher
+ * Triggered whenever a snag is assigned or reassigned
+ */
+function triggerSnagAssignmentNotification(snag, context = 'assigned') {
+  if (!snag) return;
+
+  const curUser = STATE.currentUser;
+  const curUserName = (curUser?.name || '').trim().toLowerCase();
+  const curUserRole = (curUser?.role || '').trim().toLowerCase();
+  const curUserCat = (curUser?.category || '').trim().toLowerCase();
+
+  const assignedTo = (snag.assignedUser || '').trim();
+  const assignedToLower = assignedTo.toLowerCase();
+  const snagCatLower = (snag.category || '').trim().toLowerCase();
+
+  // Check if current user should receive the alert:
+  // - Current user is explicitly named in assignment
+  // - Current user is MST / Supervisor / Admin / BMS Operator
+  // - Current user belongs to matching category
+  // - Or user just created / reassigned the snag and gets feedback confirmation
+  const isDirectAssignee = curUserName && assignedToLower.includes(curUserName);
+  const isTeamMatch = curUserCat.includes(snagCatLower) || snagCatLower.includes(curUserCat);
+  const isPrivilegedRole = !curUser || ['mst', 'engineer', 'supervisor', 'admin', 'bms operator'].includes(curUserRole);
+
+  const shouldNotify = isDirectAssignee || isTeamMatch || isPrivilegedRole;
+
+  if (!shouldNotify && context !== 'test') {
+    console.log('Notification skipped for non-matching user:', curUser?.name);
+    return;
+  }
+
+  const title = `⚡ Snag ${snag.id} Assigned to ${assignedTo || 'Technician'}!`;
+  const bodyText = `Category: ${snag.category} | Priority: ${snag.priority}\nLocation: ${snag.location} - ${snag.floor} (${snag.area})\nRemarks: ${snag.description || 'Action required'}`;
+
+  // 1. Double-Pulse Device Vibration (Inside APK and Web)
+  vibrateDevice([0, 400, 200, 400, 200, 800]);
+
+  // 2. Play Loud Melodic Ring Tone (Inside APK and Web)
+  playSnagRingSound();
+
+  // 3. Native Android Status Bar Notification / Web Push Notification
+  try {
+    if (window.AndroidBridge && typeof window.AndroidBridge.notifySnagAssigned === 'function') {
+      window.AndroidBridge.notifySnagAssigned(title, bodyText, snag.id);
+    } else if ('Notification' in window && Notification.permission === 'granted') {
       const notif = new Notification(title, {
         body: bodyText,
         icon: 'https://cdn-icons-png.flaticon.com/512/1042/1042339.png',
         badge: 'https://cdn-icons-png.flaticon.com/512/1042/1042339.png',
-        vibrate: [300, 100, 300, 100, 500],
+        vibrate: [0, 400, 200, 400, 200, 800],
         tag: `snag-${snag.id}`,
         requireInteraction: true
       });
@@ -230,33 +355,111 @@ function triggerSnagAssignmentNotification(snag) {
         window.focus();
         openDetailModal(snag.id);
       };
-    } catch (e) {}
+    }
+  } catch (e) {
+    console.warn('System push notification error:', e);
   }
 
-  // 3. Audio Beep Sound Alert
-  playNotificationSound();
-
-  // 4. In-App Floating Toast Alert
-  showInAppToastBanner(`⚡ New ${snag.category} Snag ${snag.id} Assigned to MST Team!`, `${snag.location} - ${snag.area} (${snag.priority} Priority)`, snag.id);
+  // 4. Floating Visual Toast Banner
+  showInAppToastBanner(
+    `⚡ ${snag.category} Snag Assigned: ${snag.id}`,
+    `Assigned to: ${assignedTo || 'Specialist'} • ${snag.location} (${snag.floor}) • ${snag.priority} Priority`,
+    snag.id
+  );
 }
 
-function playNotificationSound() {
-  try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.3);
-  } catch (e) {}
+/**
+ * User-triggered test function for vibration and ring sound
+ */
+function testNotificationAlert() {
+  requestNotificationPermission();
+  const testSnag = {
+    id: `TEST-${Math.floor(1000 + Math.random() * 9000)}`,
+    category: 'Electrical',
+    priority: 'High',
+    location: 'NAB-DT3',
+    floor: '3rd',
+    area: 'Server Room',
+    description: 'Test vibration and ring sound alert verification',
+    assignedUser: STATE.currentUser?.name ? `${STATE.currentUser.name} (${STATE.currentUser.role})` : 'Vikash (MST - Electrical)'
+  };
+  triggerSnagAssignmentNotification(testSnag, 'test');
+}
+
+/**
+ * Renders specialist options into a <select> element based on category and users
+ */
+function renderAssignedUserOptions(selectEl, category = 'General', currentSelected = '') {
+  if (!selectEl) return;
+  const cat = (category || 'General').trim();
+  
+  const usersList = (SYSTEM_USERS && SYSTEM_USERS.length > 0) ? SYSTEM_USERS : DEFAULT_SYSTEM_USERS;
+  
+  let optionsHtml = '';
+
+  // 1. Recommended Specialist based on category
+  optionsHtml += `<optgroup label="⭐ Recommended Specialists (${cat})">`;
+  
+  const matchingUsers = usersList.filter(u => {
+    const uCat = (u.category || '').toLowerCase();
+    const uRole = (u.role || '').toLowerCase();
+    const cLower = cat.toLowerCase();
+    return uCat.includes(cLower) || uRole.includes(cLower) || 
+      (cat === 'Electrical' && (uRole.includes('mst') || uCat.includes('electrical'))) ||
+      (cat === 'Plumbing' && (uRole.includes('plumb') || uCat.includes('plumb'))) ||
+      (cat === 'Painting' && (uRole.includes('paint') || uCat.includes('paint'))) ||
+      (cat === 'General' && (uRole.includes('bms') || uRole.includes('admin') || uCat.includes('general')));
+  });
+
+  if (matchingUsers.length > 0) {
+    matchingUsers.forEach(u => {
+      const val = `${u.name} (${u.role}${u.category && u.category !== 'General' ? ' - ' + u.category : ''})`;
+      optionsHtml += `<option value="${val}">${u.name} (${u.role}${u.category ? ' - ' + u.category : ''})</option>`;
+    });
+  } else {
+    optionsHtml += `<option value="MST Specialist Team (${cat})">MST Specialist Team (${cat})</option>`;
+  }
+  optionsHtml += `</optgroup>`;
+
+  // 2. All Registered Personnel
+  optionsHtml += `<optgroup label="👥 All Personnel & Teams">`;
+  usersList.forEach(u => {
+    const val = `${u.name} (${u.role}${u.category && u.category !== 'General' ? ' - ' + u.category : ''})`;
+    optionsHtml += `<option value="${val}">${u.name} (${u.role}) - ${u.category || 'General'}</option>`;
+  });
+  optionsHtml += `<option value="All MST Team">All MST Team</option>`;
+  optionsHtml += `<option value="BMS Operator Team">BMS Operator Team</option>`;
+  optionsHtml += `</optgroup>`;
+
+  selectEl.innerHTML = optionsHtml;
+
+  // Set selected value
+  if (currentSelected) {
+    let found = false;
+    for (let i = 0; i < selectEl.options.length; i++) {
+      if (selectEl.options[i].value === currentSelected || selectEl.options[i].value.includes(currentSelected) || currentSelected.includes(selectEl.options[i].text)) {
+        selectEl.selectedIndex = i;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      const opt = document.createElement('option');
+      opt.value = currentSelected;
+      opt.text = currentSelected;
+      opt.selected = true;
+      selectEl.appendChild(opt);
+    }
+  } else {
+    selectEl.selectedIndex = 0;
+  }
+}
+
+function handleSnagCategoryChange(newCategory) {
+  const assignedInput = document.getElementById('inputAssignedUser');
+  if (assignedInput) {
+    renderAssignedUserOptions(assignedInput, newCategory);
+  }
 }
 
 function showInAppToastBanner(title, message, snagId) {
@@ -1102,6 +1305,11 @@ function openCaptureModal() {
   if (inputLoc) {
     handleBuildingLocationChange(inputLoc.value || 'NAB-DT3');
   }
+  const inputCat = document.getElementById('inputCategory');
+  const inputAssigned = document.getElementById('inputAssignedUser');
+  if (inputAssigned) {
+    renderAssignedUserOptions(inputAssigned, inputCat?.value || 'Electrical');
+  }
 }
 
 function closeCaptureModal() {
@@ -1296,6 +1504,10 @@ function handleSaveSnag(e) {
 
     const curUser = STATE.currentUser || { name: 'Inspector', role: 'Engineer', category: 'General' };
 
+    const catVal = document.getElementById('inputCategory')?.value || 'General';
+    const selectedAssigned = document.getElementById('inputAssignedUser')?.value;
+    const finalAssignedUser = selectedAssigned || `${curUser.name} (${curUser.role} - ${curUser.category})`;
+
     const newSnag = {
       id: `SNAG-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
       timestamp: timestampStr,
@@ -1303,14 +1515,14 @@ function handleSaveSnag(e) {
       location: document.getElementById('inputLocation')?.value || 'NAB-DT3',
       floor: document.getElementById('inputFloor')?.value || '3rd',
       area: document.getElementById('inputArea')?.value || 'General',
-      category: document.getElementById('inputCategory')?.value || 'General',
+      category: catVal,
       priority: document.getElementById('inputPriority')?.value || 'Medium',
       status: document.getElementById('inputStatus')?.value || 'Open',
       description: document.getElementById('inputDescription')?.value || '',
       createdBy: curUser.name,
       createdByRole: curUser.role,
       createdByCategory: curUser.category,
-      assignedUser: `${curUser.name} (${curUser.role} - ${curUser.category})`,
+      assignedUser: finalAssignedUser,
       gps: STATE.userGps.text,
       photo: STATE.capturedPhotoDataUrl
     };
@@ -1326,8 +1538,8 @@ function handleSaveSnag(e) {
     knownSnagIds.add(newSnag.id);
     saveSnagsState();
 
-    // Trigger Push Notification & Vibration for Electrical/MST Team
-    triggerSnagAssignmentNotification(newSnag);
+    // Trigger Push Notification, Vibration & Ring Tone for Assigned Specialist
+    triggerSnagAssignmentNotification(newSnag, 'created');
 
     // Sync light payload (~12KB) to Firebase Firestore so ANY user on ANY device can view photo!
     if (STATE.isFirebaseActive && STATE.db) {
@@ -1385,14 +1597,22 @@ function updateSnagStatusDirect(snagId, newStatus) {
   updateSnagStatusAndRemark(snagId, newStatus, '', null, false);
 }
 
-function updateSnagStatusAndRemark(snagId, newStatus, remarkText, closurePhotoDataUrl, removeClosure) {
+function updateSnagStatusAndRemark(snagId, newStatus, remarkText, closurePhotoDataUrl, removeClosure, newAssignedUser) {
   const target = snagsStore.find(s => s.id === snagId);
   if (!target) {
     console.error('Target snag not found:', snagId);
     return;
   }
 
+  const prevAssignedUser = target.assignedUser;
   target.status = newStatus || target.status || 'Open';
+  
+  let wasReassigned = false;
+  if (newAssignedUser && newAssignedUser !== prevAssignedUser) {
+    target.assignedUser = newAssignedUser;
+    wasReassigned = true;
+  }
+
   const curUserStr = STATE.currentUser ? `${STATE.currentUser.name} (${STATE.currentUser.role})` : 'MST Technician';
   const nowStr = new Date().toLocaleString();
 
@@ -1426,10 +1646,16 @@ function updateSnagStatusAndRemark(snagId, newStatus, remarkText, closurePhotoDa
 
   saveSnagsState();
 
+  // If snag was reassigned, trigger instant vibration & ring notification!
+  if (wasReassigned) {
+    triggerSnagAssignmentNotification(target, 'reassigned');
+  }
+
   if (STATE.isFirebaseActive && STATE.db) {
     try {
       const updateData = {
         status: target.status || 'Open',
+        assignedUser: target.assignedUser || '',
         technicianRemark: target.technicianRemark || '',
         remarkTimestamp: target.remarkTimestamp || '',
         updatedBy: target.updatedBy || '',
@@ -1453,7 +1679,7 @@ function updateSnagStatusAndRemark(snagId, newStatus, remarkText, closurePhotoDa
       }
 
       STATE.db.collection('snags').doc(snagId).set(updateData, { merge: true })
-        .then(() => console.log(`✅ Snag ${snagId} synced to Cloud Firestore with closure photo`))
+        .then(() => console.log(`✅ Snag ${snagId} synced to Cloud Firestore with assigned user: ${target.assignedUser}`))
         .catch(err => console.error('Cloud Firestore update error:', err));
     } catch (err) {
       console.error('Error in Firestore payload prep:', err);
@@ -1720,7 +1946,11 @@ function openDetailModal(snagId) {
   document.getElementById('detailPriority').textContent = snag.priority;
   document.getElementById('detailDescription').textContent = snag.description;
   document.getElementById('detailStatusSelect').value = snag.status;
-  document.getElementById('detailAssignedUser').value = snag.assignedUser;
+  
+  const detailAssignedEl = document.getElementById('detailAssignedUser');
+  if (detailAssignedEl) {
+    renderAssignedUserOptions(detailAssignedEl, snag.category, snag.assignedUser);
+  }
   
   const remarkInput = document.getElementById('detailTechnicianRemark');
   if (remarkInput) remarkInput.value = snag.technicianRemark || '';
@@ -1763,17 +1993,19 @@ function saveDetailStatusUpdate() {
   if (!STATE.activeDetailSnagId) return;
   const newStatus = document.getElementById('detailStatusSelect').value;
   const remarkText = document.getElementById('detailTechnicianRemark')?.value.trim() || '';
+  const newAssignedUser = document.getElementById('detailAssignedUser')?.value || '';
 
   updateSnagStatusAndRemark(
     STATE.activeDetailSnagId, 
     newStatus, 
     remarkText, 
     STATE.stagedClosurePhoto, 
-    STATE.removeClosurePhotoFlag
+    STATE.removeClosurePhotoFlag,
+    newAssignedUser
   );
 
   closeDetailModal();
-  alert(`✅ Snag ${STATE.activeDetailSnagId} status updated to "${newStatus}"!`);
+  alert(`✅ Snag ${STATE.activeDetailSnagId} updated successfully!`);
 }
 
 
@@ -2289,10 +2521,18 @@ function initializeFirebaseApp(config) {
         const snag = doc.data();
         cloudSnags.push(snag);
 
-        if (!isFirstLoad && !knownSnagIds.has(snag.id)) {
-          triggerSnagAssignmentNotification(snag);
+        if (!isFirstLoad) {
+          const prevAssigned = knownSnagAssignments.get(snag.id);
+          if (!knownSnagIds.has(snag.id)) {
+            // New snag created & assigned
+            triggerSnagAssignmentNotification(snag, 'new');
+          } else if (prevAssigned && snag.assignedUser && prevAssigned !== snag.assignedUser) {
+            // Existing snag reassigned
+            triggerSnagAssignmentNotification(snag, 'reassigned');
+          }
         }
         knownSnagIds.add(snag.id);
+        knownSnagAssignments.set(snag.id, snag.assignedUser || '');
       });
       snagsStore = cloudSnags;
       saveSnagsState();

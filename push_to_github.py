@@ -13,6 +13,8 @@ FILES_TO_PUSH = [
     "styles.css",
     "app.js",
     "image (10).png",
+    "build_apk.py",
+    "APK_BUILD_GUIDE.md",
     "FIREBASE_SETUP_GUIDE.md",
     "VERCEL_GITHUB_DEPLOYMENT_GUIDE.md"
 ]
